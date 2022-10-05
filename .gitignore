@@ -153,3 +153,7 @@ cython_debug/
 
 .history
 dynamic-marker
+data/GDSC1_DrugData.csv
+data/GDSC1_fitted_dose_response_25Feb20.xlsx
+data/GDSC2_DrugData.csv
+data/GDSC2_fitted_dose_response_25Feb20.xlsx
