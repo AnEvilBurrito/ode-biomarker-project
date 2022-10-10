@@ -157,3 +157,5 @@ data/GDSC1_DrugData.csv
 data/GDSC1_fitted_dose_response_25Feb20.xlsx
 data/GDSC2_DrugData.csv
 data/GDSC2_fitted_dose_response_25Feb20.xlsx
+data/CCLE_Public_22Q2
+biomarker.db
