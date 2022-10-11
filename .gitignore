@@ -158,4 +158,6 @@ data/GDSC1_fitted_dose_response_25Feb20.xlsx
 data/GDSC2_DrugData.csv
 data/GDSC2_fitted_dose_response_25Feb20.xlsx
 data/CCLE_Public_22Q2
+data/ccle_expression.pkl
+data/gdsc.pkl
 biomarker.db
