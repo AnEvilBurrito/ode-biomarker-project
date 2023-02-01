@@ -162,3 +162,8 @@ data/ccle_expression.pkl
 data/preprocessed
 data/gdsc.pkl
 biomarker.db
+
+data/drug-response 
+data/gene-expression
+data/proteomic-expression 
+data/protein-interaction 
