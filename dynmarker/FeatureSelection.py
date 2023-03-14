@@ -73,13 +73,13 @@ def naive_test_classification(feature_data, label_data, cv=None):
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
             print(f'------ Naive test - {name}')
-            print(f'{name} score: {accuracy_score(y_test, y_pred)}')
+            print(f'{name} score: {accuracy_score(y_test, y_pred):.4f}')
 
     else:
         for model, name in zip(model_list, model_names):
             score = cross_val_score(model, feature_data, label_data, cv=cv, scoring='accuracy')
             print(f'------ Naive test - {name}')
-            print(f'{name} score: {-score.mean()}, std: {score.std()}')
+            print(f'{name} score: {score.mean():.4f}, std: {score.std():.4f}')
 
 
 def filter_feature_selection(feature_data, label_data, method, K, get_selected_data=False):
