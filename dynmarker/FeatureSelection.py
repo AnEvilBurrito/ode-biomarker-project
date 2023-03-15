@@ -14,6 +14,8 @@ from sklearn.model_selection import KFold, cross_val_score
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, accuracy_score
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from sklearn.base import clone
+
 import numpy as np 
 
 def create_feature_and_label(df: pd.DataFrame, label_name: str = 'LN_IC50'):
@@ -348,3 +350,55 @@ def mrmr_select_fcq_sklearn(X, y, K, verbose=0):
     scores[[X.columns.get_loc(c) for c in selected]] = successive_scores
 
     return scores
+
+def example_run_model_func(X, y, i, k, model, n_fold_splits, verbose=0, **kwargs):
+    '''
+    parameters
+        X: pandas.DataFrame, features
+        y: pandas.Series, target variable
+        i: int, outer fold number
+        k: int, number of features to select
+        model: sklearn model
+        n_fold_splits: int, number of inner folds
+        verbose: int, 0 or 1
+        kwargs: dict, optional arguments
+        keepModel: bool, if True, keep the model and return it, else return None
+    returns 
+       all_dfs: list of pandas.DataFrame, each element is a dataframe of the results of each inner fold
+    '''
+
+    all_dfs = []
+    keepModel = kwargs.get('keepModel', False)
+    outer_cv = KFold(n_splits=n_fold_splits, shuffle=True)
+    scores = []
+    for j, (train_index, test_index) in enumerate(outer_cv.split(X, y)):
+        X_train, X_test = X.iloc[train_index,:], X.iloc[test_index,:]
+        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+        # print(f'------------ CV Numver: {i}')   
+        
+        random_feature_train, random_indices = grand_random_selection(X.iloc[train_index,:], k=k)
+
+        # print(f'{i}, {j}, {k}, {model.__class__.__name__}, {random_indices}')
+
+        model = clone(model)
+
+        model.fit(X_train.iloc[:, random_indices], y_train)
+
+        y_pred = model.predict(X_test.iloc[:, random_indices])
+        mse = mean_squared_error(y_test, y_pred)
+        scores.append(mse)
+        # print(f'MSE: {mse:.4f}')
+
+        if keepModel == True:
+            new_df = pd.DataFrame({'i': [i], 'model_name': [model.__class__.__name__], 'k': [k], 'model': [model], 'cv_number': [j], 'feature_indices': [random_indices], 'eval_score': [mse]})
+        else:
+            new_df = pd.DataFrame({'i': [i], 'model_name': [model.__class__.__name__], 'k': [k], 'model': [None], 'cv_number': [j], 'feature_indices': [random_indices], 'eval_score': [mse]})
+
+        all_dfs.append(new_df)
+        # add the evaluation instance to the dataframe
+        # evaluation_df = pd.concat((evaluation_df, new_df), ignore_index=True)
+
+    if verbose == 1:
+        print(f'-- Iteration: {i}, feature size: {k}, model: {model.__class__.__name__}, Avg Eval Score: {np.mean(scores):.4f}, Std Eval Score: {np.std(scores):.4f}')
+    
+    return all_dfs

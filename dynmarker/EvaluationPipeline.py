@@ -8,6 +8,9 @@ import numpy as np
 class EvaluationPipeline:
 
     def __init__(self):
+        '''
+        This class is used to run a function in parallel or serial and store the results in a pandas dataframe
+        '''
 
         self.evaluation_df = pd.DataFrame(columns=['i', 'model_name', 'k', 'model', 'cv_number', 'feature_indices', 'eval_score'])
 
@@ -19,6 +22,9 @@ class EvaluationPipeline:
         self.function_set = True
 
     def run_function(self, X, y, iterations, k_ranges, model_list, n_fold_splits=5, n_cores=1, **kwargs):
+
+        # clean the evaluation dataframe
+        self.evaluation_df = pd.DataFrame(columns=['i', 'model_name', 'k', 'model', 'cv_number', 'feature_indices', 'eval_score'])
 
         if self.function_set == False:
             raise ValueError('EvaluationPipeline: The function to be run has not been set')
