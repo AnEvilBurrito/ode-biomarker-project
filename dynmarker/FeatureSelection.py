@@ -351,6 +351,7 @@ def mrmr_select_fcq_sklearn(X, y, K, verbose=0):
 
     return scores
 
+
 def example_run_model_func(X, y, i, k, model, n_fold_splits, verbose=0, **kwargs):
     '''
     parameters
