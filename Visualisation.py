@@ -8,12 +8,38 @@ import numpy as np
 from scipy.stats import pearsonr
 from sklearn.metrics import r2_score
 
+def plot_box_plot(df, category_name, score_name, title, x_label, y_label, 
+                                      fontsize=18, minitext_size=12, tick_fontsize=18,
+                                      ax=None,
+                                      plot_jitter=True,
+                                      show_correlation_coefficient=True, **kwargs):
+
+    if ax is None:
+        ax = plt.gca()
+
+    # using seaborn boxplot and stripplot
+    sns.boxplot(x=category_name, y=score_name, data=df, ax=ax, width=0.3,
+                 boxprops=dict(linewidth=1, alpha=0.25),
+                 medianprops=dict(color="black", alpha=1))
+    if plot_jitter:
+        sns.stripplot(x=category_name, y=score_name, data=df, ax=ax, alpha=0.5, size=10)
+
+    # set the title and labels
+    ax.set_title(title, fontsize=fontsize)
+    ax.set_xlabel(x_label, fontsize=fontsize)
+    ax.set_ylabel(y_label, fontsize=fontsize)
+
+    # set the mini-labels font size to large
+    ax.tick_params(axis='both', which='major', labelsize=tick_fontsize)
+
+    return ax
+
 def plot_predictions_vs_actual_values(y_test, y_pred, title, x_label, y_label, 
                                       fontsize=18, minitext_size=12, tick_fontsize=18,
                                       ax=None,
                                       plot_line_of_y_equals_x=True,
                                       plot_trend_line=True,
-                                      show_correlation_coefficient=True):
+                                      show_correlation_coefficient=True, **kwargs):
     
     if ax is None:
         ax = plt.gca()
@@ -23,7 +49,7 @@ def plot_predictions_vs_actual_values(y_test, y_pred, title, x_label, y_label,
 
     # title
     ax.set_title(title, fontsize=fontsize)
-    ax.scatter(y_test, y_pred)
+    ax.scatter(y_test, y_pred, **kwargs)
 
     # show correlation coefficient and p-value and r_squared
     if show_correlation_coefficient:
