@@ -46,7 +46,7 @@ def plot_predictions_vs_actual_values(y_test, y_pred, title, x_label, y_label,
         ax = plt.gca()
     
     if plot_line_of_y_equals_x:
-        ax.plot([0, 1], [0, 1], transform=ax.transAxes, ls='--', c='k')
+        ax.plot(y_test, y_test, linestyle='--', color='black', linewidth=1)
 
     # title
     ax.set_title(title, fontsize=fontsize)
