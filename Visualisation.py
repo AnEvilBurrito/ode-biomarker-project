@@ -19,10 +19,11 @@ def plot_box_plot(df, category_name, score_name, title, x_label, y_label,
 
     # using seaborn boxplot and stripplot
     sns.boxplot(x=category_name, y=score_name, data=df, ax=ax, width=0.3,
-                 boxprops=dict(linewidth=1, alpha=0.25),
-                 medianprops=dict(color="black", alpha=1))
+                palette='Set2',
+                boxprops=dict(linewidth=1, alpha=0.25),
+                medianprops=dict(color="black", alpha=1), **kwargs)
     if plot_jitter:
-        sns.stripplot(x=category_name, y=score_name, data=df, ax=ax, alpha=0.5, size=10)
+        sns.stripplot(x=category_name, y=score_name, data=df, ax=ax, alpha=0.5, size=10, palette='Set2')
 
     # set the title and labels
     ax.set_title(title, fontsize=fontsize)
