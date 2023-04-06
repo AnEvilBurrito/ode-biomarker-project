@@ -23,7 +23,7 @@ def plot_box_plot(df, category_name, score_name, title, x_label, y_label,
                 boxprops=dict(linewidth=1, alpha=0.25),
                 medianprops=dict(color="black", alpha=1), **kwargs)
     if plot_jitter:
-        sns.stripplot(x=category_name, y=score_name, data=df, ax=ax, alpha=0.5, size=10, palette='Set2')
+        sns.stripplot(x=category_name, y=score_name, data=df, ax=ax, alpha=0.5, size=10, palette='Set2', hue=category_name)
 
     # set the title and labels
     ax.set_title(title, fontsize=fontsize)
