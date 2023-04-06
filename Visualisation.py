@@ -65,6 +65,7 @@ def plot_predictions_vs_actual_values(y_test, y_pred, title, x_label, y_label,
         p = np.poly1d(z)
         ax.plot(y_test, p(y_test), 'grey')
 
+    ax.set_aspect('auto')
     ax.set_xlabel(x_label, fontsize=fontsize)
     ax.set_ylabel(y_label, fontsize=fontsize)
     # change x and y tick size to big font
