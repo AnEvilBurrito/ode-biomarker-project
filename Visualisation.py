@@ -40,7 +40,38 @@ def plot_predictions_vs_actual_values(y_test, y_pred, title, x_label, y_label,
                                       ax=None,
                                       plot_line_of_y_equals_x=True,
                                       plot_trend_line=True,
-                                      show_correlation_coefficient=True, **kwargs):
+                                      show_correlation_coefficient=True, *args, **kwargs):
+    
+    '''
+    plot the predictions vs actual values, the parameter data types accepts the following:
+    y_test: array-like, shape (n_samples,)
+        Ground truth (correct) target values.
+    y_pred: array-like, shape (n_samples,)
+        Estimated target values.
+    title: string
+        The title of the plot. 
+    x_label: string
+        The x-axis label of the plot.
+    y_label: string
+        The y-axis label of the plot.
+    fontsize: int
+        The font size of the title, x_label and y_label.
+    minitext_size: int
+        The font size of the correlation coefficient and p-value.
+    tick_fontsize: int
+        The font size of the x and y ticks.
+    ax: matplotlib.axes.Axes
+        The axes to plot on. If None, the current axes will be used.
+    plot_line_of_y_equals_x: bool
+        Whether to plot the line of y=x.
+    plot_trend_line: bool
+        Whether to plot a trend line.
+    show_correlation_coefficient: bool
+        Whether to show the correlation coefficient and p-value.
+    **kwargs: dict
+        Other keyword arguments are passed to matplotlib.axes.Axes.scatter.
+    returns matplotlib.axes.Axes object, this can be used to add more plots to the same figure.
+    '''
     
     if ax is None:
         ax = plt.gca()
@@ -50,7 +81,7 @@ def plot_predictions_vs_actual_values(y_test, y_pred, title, x_label, y_label,
 
     # title
     ax.set_title(title, fontsize=fontsize)
-    ax.scatter(y_test, y_pred, **kwargs)
+    ax.scatter(y_test, y_pred, *args, **kwargs)
 
     # show correlation coefficient and p-value and r_squared
     if show_correlation_coefficient:
