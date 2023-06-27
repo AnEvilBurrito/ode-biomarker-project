@@ -196,9 +196,9 @@ def run_test_get_protein_name_by_id():
     print(len(gon_ids))
     
 
-def create_joint_dataset_from_proteome_gdsc(drug_name: str, proteome: pd.DataFrame, gdsc: pd.DataFrame):
+def create_joint_dataset_from_proteome_gdsc(drug_name: str, proteome: pd.DataFrame, gdsc: pd.DataFrame, drug_value: str = 'LN_IC50'):
     drug_dataset = gdsc.loc[gdsc['DRUG_NAME'] == drug_name]
-    drug_response_data = drug_dataset[['SANGER_MODEL_ID', 'LN_IC50']]
+    drug_response_data = drug_dataset[['SANGER_MODEL_ID', drug_value]]
     drug_response_data.set_index('SANGER_MODEL_ID', inplace=True)
 
     # join the matched_proteome_dataset and the drug_response_data by Sanger_Model_ID (model_id)
@@ -212,6 +212,7 @@ def create_joint_dataset_from_ccle_gdsc2(drug_name: str,
                                          drug_df: pd.DataFrame,
                                          ccle_df: pd.DataFrame,
                                          ccle_info_df: pd.DataFrame,
+                                         drug_value: str = 'LN_IC50',
                                          keep_drug_name: bool = False, separate_feature_label: bool = False):
 
     gdsc2 = drug_df
@@ -220,7 +221,7 @@ def create_joint_dataset_from_ccle_gdsc2(drug_name: str,
 
     drug_dataset = gdsc2.loc[gdsc2['DRUG_NAME'] == drug_name]
 
-    drug_response_data = drug_dataset[['SANGER_MODEL_ID', 'LN_IC50']]
+    drug_response_data = drug_dataset[['SANGER_MODEL_ID', drug_value]]
     id_ccle_info = ccle_sample_info[['Sanger_Model_ID', 'DepMap_ID']].dropna()
 
     # find the intersection between the cell lines in drug response data and the cell lines in CCLE gene expression data using the Sanger_Model_ID
@@ -281,12 +282,12 @@ def create_joint_dataset_from_ccle_gdsc2(drug_name: str,
 
         # extract the feature data from the joined dataset
 
-        feature_data = joined_dataset.drop(columns=['LN_IC50'])
+        feature_data = joined_dataset.drop(columns=[drug_value])
         feature_data.drop(columns=['CELLLINE'], inplace=True)
 
         # extract the label data from the joined dataset
 
-        label_data = joined_dataset['LN_IC50']
+        label_data = joined_dataset[drug_value]
 
         return feature_data, label_data
 
