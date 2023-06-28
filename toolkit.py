@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 ## python imports
 import pickle
 import logging, sys # for logging
-
+from joblib import Parallel, delayed # for parallel processing
 
 # external imports
 import numpy as np
@@ -96,6 +96,49 @@ def get_preset_features(X_train, y_train, X_test, preset_features):
     return preset_features, sel_train, sel_test
 
 
+def run_single_test(condition,
+                    condition_to_get_feature_importance,
+                    matched_function,
+                    extra_arg,
+                    model_str,
+                    single_model_hyperparameters,
+                    rng,
+                    feature_data, label_data,
+                    cv_split_size,
+                    max_feature_save_size,
+                    verbose=False):
+    
+    if verbose:
+        print(f'running {model_str} with seed {rng} under {condition} conditions')
+
+    X_train, X_test, y_train, y_test = train_test_split(feature_data, label_data, test_size=cv_split_size, random_state=rng)
+
+    selected_features, sel_train, sel_test = matched_function(X_train, y_train, X_test, *extra_arg)
+    model = get_model_from_string(model_str, **single_model_hyperparameters)
+    model.fit(sel_train, y_train)
+    y_pred = model.predict(sel_test)
+    score = mean_squared_error(y_test, y_pred)
+    corr, p_val = pearsonr(y_test, y_pred)
+    r_squared = r2_score(y_test, y_pred)
+
+    shap_values = None        
+    if condition_to_get_feature_importance:
+        shap_values = get_shap_values(model, model_str, sel_train, sel_test)
+
+    if verbose:
+        print(f'--- result: prediction correlation {corr}, p-value {p_val}, r-squared {r_squared}')
+
+    # if sel_train and sel_test are too big, they will not be saved
+    if sel_train.shape[1] > max_feature_save_size:
+        sel_train = None
+    if sel_test.shape[1] > max_feature_save_size:
+        sel_test = None
+
+    return [rng, model_str, condition, selected_features, 
+                        score, corr, p_val, r_squared, shap_values, 
+                        sel_train, sel_test, y_test, y_pred]
+
+
 def run_bulk_test(conditions_to_test, 
                   conditions_to_get_feature_importance, 
                   matched_functions, 
@@ -106,9 +149,12 @@ def run_bulk_test(conditions_to_test,
                   feature_data, label_data, 
                   cv_split_size, 
                   max_feature_save_size=1000, 
+                  n_jobs=1, 
                   verbose=True,
                   save_output=True,
-                  output_file_path='output.pkl'):
+                  bulk_run_tag='bulk_run',
+                  output_file_path='output.pkl'
+                  ):
     
     '''
     This function examines the performance of different models under different conditions, with different initial seed values.
@@ -132,40 +178,43 @@ def run_bulk_test(conditions_to_test,
     save_output: boolean, whether to save the output
     output_file_path: string, the path to save the output, ignored if save_output is False
     '''
-    
-    data_collector = []
-    for model_str in models_used:
-        for rng in rng_seed_lists:
-            X_train, X_test, y_train, y_test = train_test_split(feature_data, label_data, test_size=cv_split_size,
-                                                                random_state=rng)
 
-            for j, condition in enumerate(conditions_to_test):
-                if verbose:
-                    print(f'running {model_str} with seed {rng} under {condition} conditions')
-                selected_features, sel_train, sel_test = matched_functions[j](X_train, y_train, X_test, *extra_args[j])
-                model = get_model_from_string(model_str, **models_hyperparameters[models_used.index(model_str)])
-                model.fit(sel_train, y_train)
-                y_pred = model.predict(sel_test)
-                score = mean_squared_error(y_test, y_pred)
-                corr, p_val = pearsonr(y_test, y_pred)
-                r_squared = r2_score(y_test, y_pred)
+    if n_jobs == 1:
 
-                shap_values = None        
-                if conditions_to_get_feature_importance[j]:
-                    shap_values = get_shap_values(model, model_str, sel_train, sel_test)
+        data_collector = []
+        for model_str in models_used:
+            for rng in rng_seed_lists:
+                for j, condition in enumerate(conditions_to_test):
+                    data = run_single_test(condition,
+                                        conditions_to_get_feature_importance[j],
+                                        matched_functions[j],
+                                        extra_args[j],
+                                        model_str,
+                                        models_hyperparameters[j],
+                                        rng,
+                                        feature_data, label_data,
+                                        cv_split_size,
+                                        max_feature_save_size,
+                                        verbose=verbose)
 
-                if verbose:
-                    print(f'--- result: prediction correlation {corr}, p-value {p_val}, r-squared {r_squared}')
+                    data_collector.append(data)
+    else: 
+        # use joblib to parallelize the process
+        data_collector = Parallel(n_jobs=n_jobs)(delayed(run_single_test)(condition,
+                                        conditions_to_get_feature_importance[j],
+                                        matched_functions[j],
+                                        extra_args[j],
+                                        model_str,
+                                        models_hyperparameters[j],
+                                        rng,
+                                        feature_data, label_data,
+                                        cv_split_size,
+                                        max_feature_save_size,
+                                        verbose=False) 
+                                        for model_str in models_used
+                                        for rng in rng_seed_lists
+                                        for j, condition in enumerate(conditions_to_test))
 
-                # if sel_train and sel_test are too big, they will not be saved
-                if sel_train.shape[1] > max_feature_save_size:
-                    sel_train = None
-                if sel_test.shape[1] > max_feature_save_size:
-                    sel_test = None
-
-                data_collector.append([rng, model_str, condition, selected_features, 
-                                    score, corr, p_val, r_squared, shap_values, 
-                                    sel_train, sel_test, y_test, y_pred])
                 
     if verbose:
         print('### All models ran')
@@ -174,9 +223,10 @@ def run_bulk_test(conditions_to_test,
                                             'mse', 'corr', 'p_val', 'r_squared', 'shap_values', 
                                             'X_train', 'X_test', 'y_test', 'y_pred'])
 
+    output_dict = {bulk_run_tag: df}
     if save_output:
         with open(output_file_path, 'wb') as f:
-            pickle.dump(df, f)
+            pickle.dump(output_dict, f)
 
     if verbose:
         print('### Results saved')

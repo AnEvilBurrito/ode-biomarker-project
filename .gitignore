@@ -163,6 +163,9 @@ data/preprocessed
 data/gdsc.pkl
 biomarker.db
 
+# results too many images
+data/results/visualising_omics_dataset/all_distributions_goncalves
+
 data/drug-response 
 data/gene-expression
 data/proteomic-expression 
