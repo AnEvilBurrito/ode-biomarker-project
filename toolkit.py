@@ -1,4 +1,5 @@
 # package specific imports
+from typing import Literal
 import Visualisation as vis
 import matplotlib.pyplot as plt
 
@@ -42,7 +43,32 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
 
+class FirstQuantileImputer(BaseEstimator, TransformerMixin):
 
+    def __init__(self):
+        super().__init__()
+        self.quantile_ = None
+
+    def fit(self, X, y=None):
+        self.quantile_ = X.quantile(0.25)
+        return self
+
+    def transform(self, X, y=None, return_df=False):
+        q = self.quantile_
+        for col in X.columns:
+
+            hi_bound = q[col]
+
+            if np.isnan(hi_bound):
+                hi_bound = q.dropna().min()
+
+            vals = np.random.uniform(0, hi_bound, size=X[col].isna().sum())
+            X.loc[X[col].isna(), col] = vals
+        
+        if return_df:
+            return X
+        return X.values
+    
 
 def get_model_from_string(model_name, **kwargs):
     if model_name == 'ElasticNet':
@@ -97,6 +123,21 @@ def get_preset_features(X_train, y_train, X_test, preset_features):
     sel_train, sel_test = X_train[preset_features], X_test[preset_features]
     return preset_features, sel_train, sel_test
 
+def impute_by_first_quantile(X_train, y_train, X_test):
+    # fit the imputer
+    imputer = FirstQuantileImputer()
+    imputer.fit(X_train)
+    # transform the data
+    X_train = imputer.transform(X_train, return_df=True)
+    imputer = FirstQuantileImputer()
+    imputer.fit(X_test)
+    X_test = imputer.transform(X_test, return_df=True)
+    return X_train, y_train, X_test
+
+def impute_by_zero(X_train, y_train, X_test):
+    X_train = X_train.fillna(0)
+    return X_train, y_train, X_test
+
 
 def run_single_test(condition,
                     condition_to_get_feature_importance,
@@ -139,6 +180,7 @@ def run_single_test(condition,
     return [rng, model_str, condition, selected_features, 
                         score, corr, p_val, r_squared, shap_values, 
                         sel_train, sel_test, y_test, y_pred]
+
 
 
 def run_bulk_test(conditions_to_test, 
@@ -230,8 +272,8 @@ def run_bulk_test(conditions_to_test,
         with open(output_file_path, 'wb') as f:
             pickle.dump(output_dict, f)
 
-    if verbose:
-        print('### Results saved')
+        if verbose:
+            print('### Results saved')
 
     
     return df
@@ -275,30 +317,12 @@ def get_mean_contribution(df, condition='network_f_regression_selection'):
     mean_shap_values = shap_df.mean()
     return mean_shap_values
 
-class FirstQuantileImputer(BaseEstimator, TransformerMixin):
+def get_diff_between_feature_contributions(shap_df1: pd.DataFrame, shap_df2: pd.DataFrame):
+    # compute the difference in mean shap values for each feature
+    diff = shap_df2 - shap_df1
+    diff = diff.sort_values(ascending=False)
+    return diff
 
-    def __init__(self):
-        self.quantile_ = None
+def get_abs_sum_for_feature_contributions(shap_df):
+    return shap_df.abs().sum()
 
-    def fit(self, X, y=None):
-        self.quantile_ = X.quantile(0.25)
-        return self
-    
-    def transform(self, X, y=None):
-        q = self.quantile_
-        for col in X.columns:
-            value = np.random.uniform(0, q[col], size=X[col].shape[0])
-            # convert value to pandas series
-            value = pd.Series(value, index=X[col].index)
-            # fill nan with value
-            X[col].fillna(value, inplace=True)
-        
-        return X.values
-    
-def impute_by_first_quantile(X_train, y_train, X_test):
-    # fit the imputer
-    imputer = FirstQuantileImputer()
-    imputer.fit(X_train)
-    # transform the data
-    X_train = imputer.transform(X_train)
-    return X_train, y_train, X_test
