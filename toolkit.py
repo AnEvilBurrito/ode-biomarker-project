@@ -35,6 +35,8 @@ from sklearn.neighbors import KNeighborsRegressor
 # import feature selection
 from sklearn.feature_selection import SelectKBest, f_regression
 import shap 
+from sklearn.base import BaseEstimator, TransformerMixin
+
 
 ## validation
 from sklearn.metrics import r2_score
@@ -272,3 +274,31 @@ def get_mean_contribution(df, condition='network_f_regression_selection'):
 
     mean_shap_values = shap_df.mean()
     return mean_shap_values
+
+class FirstQuantileImputer(BaseEstimator, TransformerMixin):
+
+    def __init__(self):
+        self.quantile_ = None
+
+    def fit(self, X, y=None):
+        self.quantile_ = X.quantile(0.25)
+        return self
+    
+    def transform(self, X, y=None):
+        q = self.quantile_
+        for col in X.columns:
+            value = np.random.uniform(0, q[col], size=X[col].shape[0])
+            # convert value to pandas series
+            value = pd.Series(value, index=X[col].index)
+            # fill nan with value
+            X[col].fillna(value, inplace=True)
+        
+        return X.values
+    
+def impute_by_first_quantile(X_train, y_train, X_test):
+    # fit the imputer
+    imputer = FirstQuantileImputer()
+    imputer.fit(X_train)
+    # transform the data
+    X_train = imputer.transform(X_train)
+    return X_train, y_train, X_test
