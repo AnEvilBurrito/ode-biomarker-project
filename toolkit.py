@@ -68,6 +68,259 @@ class FirstQuantileImputer(BaseEstimator, TransformerMixin):
         if return_df:
             return X
         return X.values
+
+class Toolkit:
+
+    def __init__(self, feature_data: pd.DataFrame, label_data: pd.Series) -> None:
+
+        self.feature_data = feature_data
+        self.label_data = label_data
+        
+        self.conditions = []
+        self.conditions_to_get_feature_importance = []
+        self.matched_functions = []
+        self.extra_args_for_functions = []
+
+        self.models_used = []
+        self.model_identifier = []
+        self.model_hyperparameters = []
+        self.rng_list = []
+
+        self.cv_split_size = 0.1 
+        self.max_feature_save_size = 1000
+        self.verbose = False
+
+    def add_condition(self, condition, condition_to_get_feature_importance, matched_function, extra_args_for_function):
+        self.conditions.append(condition)
+        self.conditions_to_get_feature_importance.append(condition_to_get_feature_importance)
+        self.matched_functions.append(matched_function)
+        self.extra_args_for_functions.append(extra_args_for_function)
+
+    def add_model(self, model, model_identifer, model_hyperparameters):
+        self.models_used.append(model)
+        self.model_identifier.append(model_identifer)
+        self.model_hyperparameters.append(model_hyperparameters)
+
+    def set_rng_list(self, rng_list):
+        self.rng_list = rng_list
+
+    def generate_rng_list(self, n_rng):
+        self.rng_list = np.random.randint(0, 100000, size=n_rng)
+
+    def _generic_run_single(self,
+                            condition,
+                            condition_to_get_feature_importance,
+                            matched_function,
+                            extra_arg,
+                            model_str,
+                            single_model_hyperparameters,
+                            rng,
+                            verbose=False):
+        if verbose:
+            print(f'running {model_str} with seed {rng} under {condition} conditions')
+
+        X_train, X_test, y_train, y_test = train_test_split(self.feature_data, self.label_data, test_size=self.cv_split_size, random_state=rng)
+
+        selected_features, sel_train, sel_test = matched_function(X_train, y_train, X_test, *extra_arg)
+        model = get_model_from_string(model_str, **single_model_hyperparameters)
+        model.fit(sel_train, y_train)
+        y_pred = model.predict(sel_test)
+        score = mean_squared_error(y_test, y_pred)
+        corr, p_val = pearsonr(y_test, y_pred)
+        r_squared = r2_score(y_test, y_pred)
+
+        shap_values = None        
+        if condition_to_get_feature_importance:
+            shap_values = get_shap_values(model, model_str, sel_train, sel_test)
+
+        if verbose:
+            print(f'--- result: prediction correlation {corr}, p-value {p_val}, r-squared {r_squared}')
+
+        # if sel_train and sel_test are too big, they will not be saved
+        if sel_train.shape[1] > self.max_feature_save_size:
+            sel_train = None
+        if sel_test.shape[1] > self.max_feature_save_size:
+            sel_test = None
+
+        return [rng, model_str, condition, selected_features, 
+                            score, corr, p_val, r_squared, shap_values, 
+                            sel_train, sel_test, y_test, y_pred] 
+
+    def _generic_run(self, 
+                    conditions_to_test, 
+                    conditions_to_get_feature_importance, 
+                    matched_functions, 
+                    extra_args, 
+                    models_used, 
+                    models_hyperparameters,
+                    n_jobs=1, 
+                    verbose=True,
+                    ):
+        if n_jobs == 1:
+
+            data_collector = []
+            for m, model_str in enumerate(models_used):
+                for rng in self.rng_list:
+                    for j, condition in enumerate(conditions_to_test):
+                        data = self._generic_run_single(condition,
+                                            conditions_to_get_feature_importance[j],
+                                            matched_functions[j],
+                                            extra_args[j],
+                                            model_str,
+                                            models_hyperparameters[m],
+                                            rng,
+                                            verbose=verbose)
+
+                        data_collector.append(data)
+        else: 
+            # use joblib to parallelize the process
+            data_collector = Parallel(n_jobs=n_jobs)(delayed(self._generic_run_single)(condition,
+                                            conditions_to_get_feature_importance[j],
+                                            matched_functions[j],
+                                            extra_args[j],
+                                            model_str,
+                                            models_hyperparameters[m],
+                                            rng,
+                                            verbose=False) 
+                                            for m, model_str in enumerate(models_used)
+                                            for rng in self.rng_list
+                                            for j, condition in enumerate(conditions_to_test))
+
+                    
+        if verbose:
+            print('### All models ran')
+
+        df = pd.DataFrame(data_collector, columns=['rng', 'model', 'exp_condition', 'selected_features',
+                                                'mse', 'corr', 'p_val', 'r_squared', 'shap_values', 
+                                                'X_train', 'X_test', 'y_test', 'y_pred'])        
+        return df
+
+    def run_selected_condition(self, condition, n_jobs=1, verbose=False):
+        
+        modified_conditions = []
+        modify_index = None 
+
+        for i, c in enumerate(self.conditions):
+            if condition in c:
+                modified_conditions.append(c)
+                modify_index = i
+                break 
+        
+        # if no condition is found, return None
+        if len(modified_conditions) == 0:
+            print(f"WARNING: no condition is found for {condition}")
+            print(f'available conditions are {self.conditions}')
+            return None
+        
+        modified_conditions_to_get_feature_importance = [self.conditions_to_get_feature_importance[modify_index]]
+        modified_matched_functions = [self.matched_functions[modify_index]]
+        modified_extra_args_for_functions = [self.extra_args_for_functions[modify_index]]
+
+        df = self._generic_run(modified_conditions,
+                                modified_conditions_to_get_feature_importance,
+                                modified_matched_functions,
+                                modified_extra_args_for_functions,
+                                self.models_used,
+                                self.model_hyperparameters,
+                                n_jobs=n_jobs,
+                                verbose=verbose)
+        return df
+
+    def run_selected_model(self, model_identifier, n_jobs=1, verbose=False):
+        
+        modified_model_identifiers = []
+        modified_model_hyperparameters_index = None
+
+        for i, m in enumerate(self.model_identifier):
+            if model_identifier in m:
+                modified_model_identifiers.append(m)
+                modified_model_hyperparameters_index = i
+                break
+
+        # if no model is found, return None
+        if len(modified_model_identifiers) == 0:
+            print(f"WARNING: no model is found for identifier {model_identifier}")
+            print(f'Available model identifiers are {self.model_identifier}')
+            return None
+        
+        modified_model_hyperparameters = [self.model_hyperparameters[modified_model_hyperparameters_index]]
+        modified_model_used = [self.models_used[modified_model_hyperparameters_index]]
+
+        df = self._generic_run(self.conditions,
+                                self.conditions_to_get_feature_importance,
+                                self.matched_functions,
+                                self.extra_args_for_functions,
+                                modified_model_used,
+                                modified_model_hyperparameters,
+                                n_jobs=n_jobs,
+                                verbose=verbose)
+        return df
+
+
+
+
+
+    def run_selected_condition_and_model(self, condition, model_identifier, n_jobs=1, verbose=False):
+        modified_conditions = []
+        modify_index = None 
+
+        for i, c in enumerate(self.conditions):
+            if condition in c:
+                modified_conditions.append(c)
+                modify_index = i
+                break 
+        
+        # if no condition is found, return None
+        if len(modified_conditions) == 0:
+            print(f"WARNING: no condition is found for {condition}")
+            print(f'available conditions are {self.conditions}')
+            return None
+        
+        modified_model_identifiers = []
+        modified_model_hyperparameters_index = None
+
+        for i, m in enumerate(self.model_identifier):
+            if model_identifier in m:
+                modified_model_identifiers.append(m)
+                modified_model_hyperparameters_index = i
+                break
+
+        # if no model is found, return None
+        if len(modified_model_identifiers) == 0:
+            print(f"WARNING: no model is found for identifier {model_identifier}")
+            print(f'Available model identifiers are {self.model_identifier}')
+            return None
+        
+        modified_model_hyperparameters = [self.model_hyperparameters[modified_model_hyperparameters_index]]
+        modified_model_used = [self.models_used[modified_model_hyperparameters_index]]
+
+        modified_conditions_to_get_feature_importance = [self.conditions_to_get_feature_importance[modify_index]]
+        modified_matched_functions = [self.matched_functions[modify_index]]
+        modified_extra_args_for_functions = [self.extra_args_for_functions[modify_index]]
+
+        df = self._generic_run(modified_conditions,
+                                modified_conditions_to_get_feature_importance,
+                                modified_matched_functions,
+                                modified_extra_args_for_functions,
+                                modified_model_used,
+                                modified_model_hyperparameters,
+                                n_jobs=n_jobs,
+                                verbose=verbose)
+        return df
+
+
+    def run_all(self, n_jobs=1, verbose=False):
+        
+        df = self._generic_run(self.conditions,
+                                self.conditions_to_get_feature_importance,
+                                self.matched_functions,
+                                self.extra_args_for_functions,
+                                self.models_used,
+                                self.model_hyperparameters,
+                                n_jobs=n_jobs,
+                                verbose=verbose)
+        return df
+    
     
 
 def get_model_from_string(model_name, **kwargs):
@@ -137,6 +390,31 @@ def impute_by_first_quantile(X_train, y_train, X_test):
 def impute_by_zero(X_train, y_train, X_test):
     X_train = X_train.fillna(0)
     return X_train, y_train, X_test
+
+def impute_with_random_selection(X_train, y_train, X_test, n_features):
+    X_train, y_train, X_test = impute_by_first_quantile(X_train, y_train, X_test)
+    features, X_train, X_test = get_random_features(X_train, y_train, X_test, n_features)
+    return features, X_train, X_test
+
+def impute_with_stat_selection(X_train, y_train, X_test, statistical_filter_size):
+    X_train, y_train, X_test = impute_by_first_quantile(X_train, y_train, X_test)
+    # perform feature selection on the training set
+    selector = SelectKBest(f_regression, k=statistical_filter_size)
+    selector.fit(X_train, y_train)
+    # get the selected features
+    selected_features = X_train.columns[selector.get_support()]
+    sel_train, sel_test = X_train[selected_features], X_test[selected_features]
+    return selected_features, sel_train, sel_test
+
+def impute_with_network_stat_selection(X_train, y_train, X_test, nth_degree_neighbours, max_gene_target_disance, statistical_filter_size):
+    X_train, y_train, X_test = impute_by_first_quantile(X_train, y_train, X_test)
+    features, sel_train, sel_test = get_network_stat_features(X_train, y_train, X_test, nth_degree_neighbours, max_gene_target_disance, statistical_filter_size)
+    return features, sel_train, sel_test
+
+def impute_with_preset_features(X_train, y_train, X_test, preset_features):
+    X_train, y_train, X_test = impute_by_first_quantile(X_train, y_train, X_test)
+    features, sel_train, sel_test = get_preset_features(X_train, y_train, X_test, preset_features)
+    return features, sel_train, sel_test
 
 
 def run_single_test(condition,
