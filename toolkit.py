@@ -69,9 +69,40 @@ class FirstQuantileImputer(BaseEstimator, TransformerMixin):
             return X
         return X.values
 
+
+class FeatureTransformer:
+    def __init__(self):
+        self.transform_functions = {}
+
+    def add_transform_function(self, name: str, transform_function, *args):
+        self.transform_functions[name] = {'transform_function': transform_function, 'args': args}
+    
+    def get_transform_function(self, name: str):
+        return self.transform_functions[name]['transform_function']
+    
+    def get_transform_function_args(self, name: str):
+        return self.transform_functions[name]['args']
+    
+    def get_transform_function_names(self):
+        return self.transform_functions.keys()
+    
+    def remove_transform_function(self, name: str):
+        self.transform_functions.pop(name)
+
+    def run_all_transform(self, X_train, y_train, X_test):
+        for name in self.transform_functions.keys():
+            transform_function = self.get_transform_function(name)
+            transform_args = self.get_transform_function_args(name)
+            X_train, y_train, X_test = transform_function(X_train, y_train, X_test, *transform_args)
+        return X_train, y_train, X_test
+
 class Toolkit:
 
     def __init__(self, feature_data: pd.DataFrame, label_data: pd.Series) -> None:
+
+        '''
+        Toolkit contains config parameters and the cleaned dataset for the analysis
+        '''
 
         self.feature_data = feature_data
         self.label_data = label_data
@@ -393,6 +424,7 @@ def impute_by_first_quantile(X_train, y_train, X_test):
 
 def impute_by_zero(X_train, y_train, X_test):
     X_train = X_train.fillna(0)
+    X_test = X_test.fillna(0)
     return X_train, y_train, X_test
 
 def impute_with_random_selection(X_train, y_train, X_test, n_features):
@@ -420,6 +452,7 @@ def impute_with_preset_features(X_train, y_train, X_test, preset_features):
     features, sel_train, sel_test = get_preset_features(X_train, y_train, X_test, preset_features)
     return features, sel_train, sel_test
 
+    
 
 def run_single_test(condition,
                     condition_to_get_feature_importance,
