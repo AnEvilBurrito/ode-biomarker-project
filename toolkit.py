@@ -156,6 +156,10 @@ class Toolkit:
                     n_jobs=1, 
                     verbose=True,
                     ):
+        
+        if len(self.rng_list) == 0:
+            raise ValueError('Toolkit: rng_list is empty, please set it or generate it')
+        
         if n_jobs == 1:
 
             data_collector = []
