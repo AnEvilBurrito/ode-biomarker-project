@@ -226,7 +226,7 @@ def run_bulk_test(conditions_to_test,
     if n_jobs == 1:
 
         data_collector = []
-        for model_str in models_used:
+        for m, model_str in enumerate(models_used):
             for rng in rng_seed_lists:
                 for j, condition in enumerate(conditions_to_test):
                     data = run_single_test(condition,
@@ -234,7 +234,7 @@ def run_bulk_test(conditions_to_test,
                                         matched_functions[j],
                                         extra_args[j],
                                         model_str,
-                                        models_hyperparameters[j],
+                                        models_hyperparameters[m],
                                         rng,
                                         feature_data, label_data,
                                         cv_split_size,
@@ -249,13 +249,13 @@ def run_bulk_test(conditions_to_test,
                                         matched_functions[j],
                                         extra_args[j],
                                         model_str,
-                                        models_hyperparameters[j],
+                                        models_hyperparameters[m],
                                         rng,
                                         feature_data, label_data,
                                         cv_split_size,
                                         max_feature_save_size,
                                         verbose=False) 
-                                        for model_str in models_used
+                                        for m, model_str in enumerate(models_used)
                                         for rng in rng_seed_lists
                                         for j, condition in enumerate(conditions_to_test))
 
