@@ -184,18 +184,21 @@ class Toolkit:
                     extra_args, 
                     models_used, 
                     models_hyperparameters,
+                    rng_list=None,
                     n_jobs=1, 
                     verbose=True,
                     ):
         
-        if len(self.rng_list) == 0:
-            raise ValueError('Toolkit: rng_list is empty, please set it or generate it')
+        if rng_list is None:
+            rng_list = self.rng_list
+            if len(self.rng_list) == 0:
+                raise ValueError('Toolkit: rng_list is empty, please set it or generate it')
         
         if n_jobs == 1:
 
             data_collector = []
             for m, model_str in enumerate(models_used):
-                for rng in self.rng_list:
+                for rng in rng_list:
                     for j, condition in enumerate(conditions_to_test):
                         data = self._generic_run_single(condition,
                                             conditions_to_get_feature_importance[j],
@@ -218,7 +221,7 @@ class Toolkit:
                                             rng,
                                             verbose=False) 
                                             for m, model_str in enumerate(models_used)
-                                            for rng in self.rng_list
+                                            for rng in rng_list
                                             for j, condition in enumerate(conditions_to_test))
 
                     
@@ -230,7 +233,7 @@ class Toolkit:
                                                 'X_train', 'X_test', 'y_test', 'y_pred'])        
         return df
 
-    def run_selected_condition(self, condition, n_jobs=1, verbose=False):
+    def run_selected_condition(self, condition, rng_list=None, n_jobs=1, verbose=False):
         
         modified_conditions = []
         modify_index = None 
@@ -257,11 +260,12 @@ class Toolkit:
                                 modified_extra_args_for_functions,
                                 self.models_used,
                                 self.model_hyperparameters,
+                                rng_list=rng_list,
                                 n_jobs=n_jobs,
                                 verbose=verbose)
         return df
 
-    def run_selected_model(self, model_identifier, n_jobs=1, verbose=False):
+    def run_selected_model(self, model_identifier, rng_list=None, n_jobs=1, verbose=False):
         
         modified_model_identifiers = []
         modified_model_hyperparameters_index = None
@@ -287,6 +291,7 @@ class Toolkit:
                                 self.extra_args_for_functions,
                                 modified_model_used,
                                 modified_model_hyperparameters,
+                                rng_list=rng_list,
                                 n_jobs=n_jobs,
                                 verbose=verbose)
         return df
@@ -295,7 +300,7 @@ class Toolkit:
 
 
 
-    def run_selected_condition_and_model(self, condition, model_identifier, n_jobs=1, verbose=False):
+    def run_selected_condition_and_model(self, condition, model_identifier, rng_list=None, n_jobs=1, verbose=False):
         modified_conditions = []
         modify_index = None 
 
@@ -339,12 +344,13 @@ class Toolkit:
                                 modified_extra_args_for_functions,
                                 modified_model_used,
                                 modified_model_hyperparameters,
+                                rng_list=rng_list,
                                 n_jobs=n_jobs,
                                 verbose=verbose)
         return df
 
 
-    def run_all(self, n_jobs=1, verbose=False):
+    def run_all(self, rng_list=None, n_jobs=1, verbose=False):
         
         df = self._generic_run(self.conditions,
                                 self.conditions_to_get_feature_importance,
@@ -352,9 +358,53 @@ class Toolkit:
                                 self.extra_args_for_functions,
                                 self.models_used,
                                 self.model_hyperparameters,
+                                rng_list=rng_list,
                                 n_jobs=n_jobs,
                                 verbose=verbose)
         return df
+    
+    def run_until_consensus(self, condition, rel_tol: float = 0.001, n_jobs=1, verbose=True):
+
+        
+        
+        rng_list = []
+
+        current_tol = 1e10 
+        current_contrib = 0 
+        prev_contrb = 0
+
+        while current_tol > rel_tol:
+            
+            rng = np.random.randint(0, 10000000)
+            rng_list.append(rng)
+
+            rng_list_to_run = [rng]
+
+            df = self.run_selected_condition(condition, rng_list=rng_list_to_run, n_jobs=n_jobs, verbose=verbose)
+
+            if df is None:
+                raise ValueError(f'no df is returned for condition {condition}')
+
+            current_contrib = get_mean_contribution(df, condition)
+
+            if prev_contrb == 0:
+                prev_contrb = current_contrib
+            else:
+                diff = get_diff_between_feature_contributions(current_contrib, prev_contrb)
+                abs_diff = get_abs_sum_for_feature_contributions(diff)
+                abs_prev = get_abs_sum_for_feature_contributions(prev_contrb)
+                current_tol = 1 - (abs_prev - abs_diff) / abs_prev
+                prev_contrb = current_contrib
+                if verbose: 
+                    print(f'current iteration: {len(rng_list)} current_tol: {current_tol}, abs_diff: {abs_diff}, abs_prev: {abs_prev}')
+
+        return rng_list, df
+
+
+
+                
+                
+                
     
     
 
