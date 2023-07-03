@@ -363,42 +363,76 @@ class Toolkit:
                                 verbose=verbose)
         return df
     
-    def run_until_consensus(self, condition, rel_tol: float = 0.001, n_jobs=1, verbose=True):
+    def run_until_consensus(self, condition: str, 
+                            rel_tol: float = 0.01, 
+                            abs_tol: float = 0.001,
+                            max_iter: int = 100,
+                            n_jobs=1, verbose=True, verbose_level=1):
 
         
         
         rng_list = []
 
         current_tol = 1e10 
+        abs_diff = 1e10
         current_contrib = 0 
-        prev_contrb = 0
+        prev_contrib = 0
 
-        while current_tol > rel_tol:
+        total_df = pd.DataFrame()
+
+        while current_tol > rel_tol and abs_diff > abs_tol and len(rng_list) < max_iter:
             
             rng = np.random.randint(0, 10000000)
             rng_list.append(rng)
 
             rng_list_to_run = [rng]
-
-            df = self.run_selected_condition(condition, rng_list=rng_list_to_run, n_jobs=n_jobs, verbose=verbose)
-
+            if verbose and verbose_level >= 3:
+                print(f'running condition {condition} with rng {rng}')
+            verbose_at_run = False
+            if verbose and verbose_level >= 2:
+                verbose_at_run = True
+            df = self.run_selected_condition(condition, rng_list=rng_list_to_run, n_jobs=n_jobs, verbose=verbose_at_run)
+            if verbose and verbose_level >= 3:
+                print(f'finished running condition {condition} with rng {rng}')
             if df is None:
                 raise ValueError(f'no df is returned for condition {condition}')
+            else: 
+                total_df = pd.concat([total_df, df], axis=0)
+            if verbose and verbose_level >= 3:
+                print(f'finished concatenating df for condition {condition} with rng {rng}')
 
-            current_contrib = get_mean_contribution(df, condition)
-
-            if prev_contrb == 0:
-                prev_contrb = current_contrib
+            if isinstance(prev_contrib, int):
+                if verbose and verbose_level >= 3:
+                    print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
+                prev_contrib = get_mean_contribution(total_df, condition)
             else:
-                diff = get_diff_between_feature_contributions(current_contrib, prev_contrb)
+                current_contrib = get_mean_contribution(total_df, condition)
+                if verbose and verbose_level >= 3:
+                    # print(f'{prev_contrib}, {current_contrib}')
+                    print(f'total abs prev: {get_abs_sum_for_feature_contributions(prev_contrib)}, total abs current: {get_abs_sum_for_feature_contributions(current_contrib)}')
+                diff = get_diff_between_feature_contributions(current_contrib, prev_contrib)
                 abs_diff = get_abs_sum_for_feature_contributions(diff)
-                abs_prev = get_abs_sum_for_feature_contributions(prev_contrb)
+                abs_prev = get_abs_sum_for_feature_contributions(prev_contrib)
                 current_tol = 1 - (abs_prev - abs_diff) / abs_prev
-                prev_contrb = current_contrib
-                if verbose: 
+                prev_contrib = current_contrib
+                if verbose and verbose_level >= 1: 
                     print(f'current iteration: {len(rng_list)} current_tol: {current_tol}, abs_diff: {abs_diff}, abs_prev: {abs_prev}')
+            
+        if verbose and verbose_level >= 0: 
+            # display in one line 
+            print(f'Consensus Run: condition {condition} is done in {len(rng_list)} iterations')
 
-        return rng_list, df
+            if current_tol >= rel_tol:
+                print(f'Consensus Run under condition {condition} is NOT converged within {rel_tol} relative tolerance')
+
+            if abs_diff >= abs_tol:
+                print(f'Consensus Run under condition {condition} is NOT converged within {abs_tol} absolute tolerance')
+
+
+            if len(rng_list) >= max_iter:
+                print(f'WARNING: Consensus Run under condition {condition} is not converged within {max_iter} iterations')
+
+        return rng_list, total_df
 
 
 
