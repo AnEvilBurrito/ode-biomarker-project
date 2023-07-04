@@ -35,7 +35,7 @@ def plot_box_plot(df, category_name, score_name, title, x_label, y_label,
 
     return ax
 
-def plot_predictions_vs_actual_values(y_test, y_pred, title, x_label, y_label, 
+def plot_predictions_vs_actual_values(y_test, y_pred, title='', x_label='Predicted', y_label='Actual', 
                                       fontsize=18, minitext_size=12, tick_fontsize=18,
                                       ax=None,
                                       plot_line_of_y_equals_x=True,
