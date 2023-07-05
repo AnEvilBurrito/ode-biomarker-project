@@ -407,6 +407,9 @@ class Toolkit:
                 prev_contrib = get_mean_contribution(total_df, condition, absolute_value=True)
             else:
                 current_contrib = get_mean_contribution(total_df, condition, absolute_value=True)
+                # print the first five features in one line by converting to list
+                if verbose and verbose_level >= 1:
+                    print(f'current_contrib: {list(current_contrib.index[:5])}')
                 if verbose and verbose_level >= 3:
                     # print(f'{prev_contrib}, {current_contrib}')
                     print(f'total abs prev: {get_abs_sum_for_feature_contributions(prev_contrib)}, total abs current: {get_abs_sum_for_feature_contributions(current_contrib)}')
@@ -416,7 +419,8 @@ class Toolkit:
                 current_tol = 1 - (abs_prev - abs_diff) / abs_prev
                 prev_contrib = current_contrib
                 if verbose and verbose_level >= 1: 
-                    print(f'current iteration: {len(rng_list)} current_tol: {current_tol}, abs_diff: {abs_diff}, abs_prev: {abs_prev}, corr: {df["corr"].mean()}')
+                    print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, corr: {df["corr"].mean():2f}')
+                    
             
         if verbose and verbose_level >= 0: 
             # display in one line 
@@ -433,14 +437,6 @@ class Toolkit:
                 print(f'WARNING: Consensus Run under condition {condition} is not converged within {max_iter} iterations')
 
         return rng_list, total_df
-
-
-
-                
-                
-                
-    
-    
 
 def get_model_from_string(model_name, **kwargs):
     if model_name == 'ElasticNet':
@@ -677,54 +673,42 @@ def run_bulk_test(conditions_to_test,
     
     return df
 
-def get_mean_contribution(df, condition='network_f_regression_selection', absolute_value=False):
+def get_mean_contribution(df, condition='random', absolute_value=True):
     # df: dataframe with shap_values, X_train, X_test and a 'exp_condition' columns
     # extract all the shap values, match the feature names and store them in a dataframe
 
     # for the df, select only the row with the exp_condition column == 'experimental'
     df = df[df['exp_condition'] == condition]
 
-    collector = []
-    for shap, x_test in zip(df['shap_values'], df['X_test']):
-        # print(shap.shape, cols.shape)
-        # use absolute value if specified, in most cases, 
-        # absolute value is NOT recommended, because it will make the positive and negative contributions indistinguishable
+    all_shap_values = []
+    for i in range(df.shape[0]):
+        shap_values = df['shap_values'].iloc[i]
+        X_test = df['X_test'].iloc[i]
         if absolute_value:
-            shap = np.abs(shap)
-        mean_shap = shap.mean(axis=0)
-        column_names = x_test.columns
-        joint_data = list(zip(column_names, mean_shap))
-        # sort the joint data by column names
-        joint_data.sort(key=lambda x: x[0])
-        collector.append(joint_data)
+            mean_shap_values = np.abs(shap_values).mean(axis=0)
+        else:
+            mean_shap_values = shap_values.mean(axis=0)
+        mean_shap_df = pd.DataFrame({'mean_shap_values': mean_shap_values, 'feature_names': X_test.columns.tolist()})
+        mean_shap_df.sort_values(by='mean_shap_values', ascending=False, inplace=True)
+        all_shap_values.append(mean_shap_df)
 
-    # first, create a list of column names
+    # for all shap values, join them together
+    all_shap_values_df = pd.concat(all_shap_values)
 
-    column_names = [x[0] for x in collector[0]]
+    # group by feature name and compute the mean shap value
+    mean_shap_values_df = all_shap_values_df.groupby('feature_names').mean()
 
-    shap_df = pd.DataFrame(collector, columns=column_names)
+    # sort by mean shap value
+    mean_shap_values_df.sort_values(by='mean_shap_values', ascending=False, inplace=True)
 
-    # for every cell in the dataframe, keep only the shap value, which is the second element in the tuple
-
-    for col in shap_df.columns:
-        shap_df[col] = shap_df[col].apply(lambda x: x[1])
-
-    # sort the dataframe columns by the mean shap values
-
-    shap_df = shap_df.reindex(shap_df.mean().sort_values(ascending=False).index, axis=1)
-
-
-    # compute the mean shap values for each column
-
-    mean_shap_values = shap_df.mean()
-    return mean_shap_values
+    return mean_shap_values_df
 
 def get_diff_between_feature_contributions(shap_df1: pd.DataFrame, shap_df2: pd.DataFrame):
     # compute the difference in mean shap values for each feature
-    diff = shap_df2 - shap_df1
-    diff = diff.sort_values(ascending=False)
+    diff = shap_df2.copy()
+    diff['mean_shap_values'] = shap_df2['mean_shap_values'] - shap_df1['mean_shap_values']
     return diff
 
-def get_abs_sum_for_feature_contributions(shap_df):
-    return shap_df.abs().sum()
+def get_abs_sum_for_feature_contributions(df: pd.DataFrame):
+    return np.abs(df['mean_shap_values']).sum()
 
