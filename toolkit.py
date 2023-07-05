@@ -404,9 +404,9 @@ class Toolkit:
             if isinstance(prev_contrib, int):
                 if verbose and verbose_level >= 3:
                     print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
-                prev_contrib = get_mean_contribution(total_df, condition)
+                prev_contrib = get_mean_contribution(total_df, condition, absolute_value=True)
             else:
-                current_contrib = get_mean_contribution(total_df, condition)
+                current_contrib = get_mean_contribution(total_df, condition, absolute_value=True)
                 if verbose and verbose_level >= 3:
                     # print(f'{prev_contrib}, {current_contrib}')
                     print(f'total abs prev: {get_abs_sum_for_feature_contributions(prev_contrib)}, total abs current: {get_abs_sum_for_feature_contributions(current_contrib)}')
@@ -416,7 +416,7 @@ class Toolkit:
                 current_tol = 1 - (abs_prev - abs_diff) / abs_prev
                 prev_contrib = current_contrib
                 if verbose and verbose_level >= 1: 
-                    print(f'current iteration: {len(rng_list)} current_tol: {current_tol}, abs_diff: {abs_diff}, abs_prev: {abs_prev}')
+                    print(f'current iteration: {len(rng_list)} current_tol: {current_tol}, abs_diff: {abs_diff}, abs_prev: {abs_prev}, corr: {df["corr"].mean()}')
             
         if verbose and verbose_level >= 0: 
             # display in one line 
@@ -677,7 +677,7 @@ def run_bulk_test(conditions_to_test,
     
     return df
 
-def get_mean_contribution(df, condition='network_f_regression_selection'):
+def get_mean_contribution(df, condition='network_f_regression_selection', absolute_value=False):
     # df: dataframe with shap_values, X_train, X_test and a 'exp_condition' columns
     # extract all the shap values, match the feature names and store them in a dataframe
 
@@ -687,7 +687,11 @@ def get_mean_contribution(df, condition='network_f_regression_selection'):
     collector = []
     for shap, x_test in zip(df['shap_values'], df['X_test']):
         # print(shap.shape, cols.shape)
-        mean_shap = np.abs(shap).mean(axis=0)
+        # use absolute value if specified, in most cases, 
+        # absolute value is NOT recommended, because it will make the positive and negative contributions indistinguishable
+        if absolute_value:
+            shap = np.abs(shap)
+        mean_shap = shap.mean(axis=0)
         column_names = x_test.columns
         joint_data = list(zip(column_names, mean_shap))
         # sort the joint data by column names
@@ -708,7 +712,6 @@ def get_mean_contribution(df, condition='network_f_regression_selection'):
     # sort the dataframe columns by the mean shap values
 
     shap_df = shap_df.reindex(shap_df.mean().sort_values(ascending=False).index, axis=1)
-    shap_df.head()
 
 
     # compute the mean shap values for each column
