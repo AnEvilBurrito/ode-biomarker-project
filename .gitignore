@@ -171,3 +171,6 @@ data/gene-expression
 data/proteomic-expression 
 data/protein-interaction 
 data/processed-results
+
+# make exception for the following files
+!data/protein-interaction/STRING/palbociclib_nth_degree_neighbours.pkl
