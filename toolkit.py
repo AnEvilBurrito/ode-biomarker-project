@@ -673,9 +673,11 @@ def run_bulk_test(conditions_to_test,
     
     return df
 
-def get_mean_contribution(df, condition='random', absolute_value=True):
+def get_mean_contribution(df, condition='random', absolute_value=True, strict_mean=0.2):
     # df: dataframe with shap_values, X_train, X_test and a 'exp_condition' columns
     # extract all the shap values, match the feature names and store them in a dataframe
+
+    # strict mean: feature must be present in at least x% of iterations
 
     # for the df, select only the row with the exp_condition column == 'experimental'
     df = df[df['exp_condition'] == condition]
@@ -695,8 +697,15 @@ def get_mean_contribution(df, condition='random', absolute_value=True):
     # for all shap values, join them together
     all_shap_values_df = pd.concat(all_shap_values)
 
+    # get the occurrence of each feature name
+    feature_count = all_shap_values_df.groupby('feature_names').count()
+
     # group by feature name and compute the mean shap value
     mean_shap_values_df = all_shap_values_df.groupby('feature_names').mean()
+
+    mean_shap_values_df['count'] = feature_count['mean_shap_values']
+
+    mean_shap_values_df = mean_shap_values_df[mean_shap_values_df['count'] >= df.shape[0] * strict_mean]
 
     # sort by mean shap value
     mean_shap_values_df.sort_values(by='mean_shap_values', ascending=False, inplace=True)
