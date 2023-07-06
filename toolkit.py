@@ -404,9 +404,10 @@ class Toolkit:
             if isinstance(prev_contrib, int):
                 if verbose and verbose_level >= 3:
                     print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
-                prev_contrib = get_mean_contribution(total_df, condition, absolute_value=True)
+                prev_contrib = get_mean_contribution(total_df, condition, absolute_value=True, strict_mean=0)
+                # strict mean = 0, sum only at the end
             else:
-                current_contrib = get_mean_contribution(total_df, condition, absolute_value=True)
+                current_contrib = get_mean_contribution(total_df, condition, absolute_value=True, strict_mean=0)
                 # print the first five features in one line by converting to list
                 if verbose and verbose_level >= 1:
                     print(f'current_contrib: {list(current_contrib.index[:5])}')
@@ -673,7 +674,7 @@ def run_bulk_test(conditions_to_test,
     
     return df
 
-def get_mean_contribution(df, condition='random', absolute_value=True, strict_mean=0.2):
+def get_mean_contribution(df, condition='random', absolute_value=True, strict_mean=0.25):
     # df: dataframe with shap_values, X_train, X_test and a 'exp_condition' columns
     # extract all the shap values, match the feature names and store them in a dataframe
 
