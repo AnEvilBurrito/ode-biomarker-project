@@ -104,3 +104,63 @@ def plot_predictions_vs_actual_values(y_test, y_pred, title='', x_label='Predict
     ax.grid()
     
     return ax
+
+def plot_correlation(df, x_field, y_field, ax,
+                     title='', xlabel='', ylabel='',
+                      **kwargs):
+    
+    '''
+    Inputs: 
+    df: pandas dataframe
+    x_field: string
+        The name of the column in the dataframe to be used as the x-axis.
+    y_field: string
+        The name of the column in the dataframe to be used as the y-axis.
+    ax: matplotlib.axes.Axes
+        The axes to plot on. If None, the current axes will be used.
+    title: string
+        The title of the plot.
+    xlabel: string
+        The x-axis label of the plot.
+    ylabel: string
+        The y-axis label of the plot.
+
+    returns matplotlib.axes.Axes object, this can be used to add more plots to the same figure. 
+
+    '''
+    """Plot a scatter plot with a line of best fit and correlation coefficient"""
+    # plot the scatter plot
+    ax.scatter(df[x_field], df[y_field], **kwargs)
+    # create line of best fit
+    try: 
+        m, b = np.polyfit(df[x_field], df[y_field], 1)
+    except Exception as e:
+        m, b = 0, 0
+    ax.plot(df[x_field], m*df[x_field] + b, color='grey', linestyle='--')
+    # show correlation coefficient in the title
+    # corr = str(round(np.corrcoef(df[x_field], df[y_field])[0, 1], 2))
+
+    corr, pval = pearsonr(df[x_field], df[y_field])
+    corr = str(round(corr, 2))
+    if pval < 0.05:
+        corr = corr + '*'
+    else: 
+        corr = corr + 'n.s.'
+    if title == '':
+        ax.set_title(f'{x_field} vs {y_field} (r={corr})')
+    else:
+        ax.set_title(title)
+    
+    if xlabel == '':
+        ax.set_xlabel(x_field)
+    else:
+        ax.set_xlabel(xlabel)
+    
+    if ylabel == '':
+        ax.set_ylabel(y_field)
+    else:
+        ax.set_ylabel(ylabel)
+    # add corr as a caption in the plot
+    ax.text(0.05, 0.97, f'r={corr}', transform=ax.transAxes, fontsize=14, verticalalignment='top')
+
+    return ax
