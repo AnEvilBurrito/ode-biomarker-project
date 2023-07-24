@@ -35,7 +35,7 @@ def plot_box_plot(df, category_name, score_name, title, x_label, y_label,
 
     return ax
 
-def plot_predictions_vs_actual_values(y_test, y_pred, title='', x_label='Predicted', y_label='Actual', 
+def plot_predictions_vs_actual_values(y_test, y_pred, title='', x_label='Actual', y_label='Predicted', 
                                       fontsize=18, minitext_size=12, tick_fontsize=18,
                                       ax=None,
                                       plot_line_of_y_equals_x=True,
@@ -163,4 +163,22 @@ def plot_correlation(df, x_field, y_field, ax,
     # add corr as a caption in the plot
     ax.text(0.05, 0.97, f'r={corr}', transform=ax.transAxes, fontsize=14, verticalalignment='top')
 
+    return ax
+
+
+def plot_histogram(df, field, ax, title='', xlabel='', ylabel='', **kwargs):
+    """Plot a histogram"""
+    ax.hist(df[field], **kwargs)
+    if title == '':
+        ax.set_title(field)
+    else:
+        ax.set_title(title)
+    if xlabel == '':
+        ax.set_xlabel(field)
+    else:
+        ax.set_xlabel(xlabel)
+    if ylabel == '':
+        ax.set_ylabel('Count')
+    else:
+        ax.set_ylabel(ylabel)
     return ax
