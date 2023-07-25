@@ -12,18 +12,22 @@ def plot_box_plot(df, category_name, score_name, title, x_label, y_label,
                                       fontsize=18, minitext_size=12, tick_fontsize=18,
                                       ax=None,
                                       plot_jitter=True,
-                                      show_correlation_coefficient=True, **kwargs):
+                                      show_correlation_coefficient=True, 
+                                      palette='Set2',
+                                      **kwargs):
+    
+    # palette can also be in a seaborn palette object: palette=sns.color_palette(['#e41a1c', '#377eb8', '#4daf4a'], n_colors=3)
 
     if ax is None:
         ax = plt.gca()
 
     # using seaborn boxplot and stripplot
     sns.boxplot(x=category_name, y=score_name, data=df, ax=ax, width=0.3,
-                palette='Set2',
+                palette=palette,
                 boxprops=dict(linewidth=1, alpha=0.25),
                 medianprops=dict(color="black", alpha=1), **kwargs)
     if plot_jitter:
-        sns.stripplot(x=category_name, y=score_name, data=df, ax=ax, alpha=0.5, size=10, palette='Set2', hue=category_name)
+        sns.stripplot(x=category_name, y=score_name, data=df, ax=ax, alpha=0.5, size=10, palette=palette, hue=category_name)
 
     # set the title and labels
     ax.set_title(title, fontsize=fontsize)
