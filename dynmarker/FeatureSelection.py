@@ -15,6 +15,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, accuracy_score
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.base import clone
+import sklearn_relief as sr
 
 import numpy as np 
 
@@ -108,7 +109,25 @@ def filter_feature_selection(feature_data, label_data, method, K, get_selected_d
     # print(ranked_features)
     return selected_scores, support
 
-def mrmr_select_fcq(X, y, K, verbose=0, return_index=True):
+def enet_select(X: pd.DataFrame, y: pd.Series, k: int, max_iter=10000):
+    enet = ElasticNet(max_iter=max_iter)
+    enet.fit(X,y)
+    coef = enet.coef_
+    abs_coef = np.abs(coef)
+    indices = np.flip(np.argsort(abs_coef), 0)[0:k]
+    return indices, coef[indices]
+    
+
+def relieff_select(X: pd.DataFrame, y: pd.Series, k: int, n_jobs=1):
+    if n_jobs == -1: 
+        r = sr.RReliefF(n_features = k)
+    else:
+        r = sr.RReliefF(n_features = k, n_jobs=n_jobs)
+    r.fit(X.to_numpy(), y.to_numpy())
+    feat_indices = np.flip(np.argsort(r.w_), 0)[0:k]
+    return feat_indices, r.w_[feat_indices]
+
+def mrmr_select_fcq(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_index=True):
 
     # ------------ Input
     # X: pandas.DataFrame, features
