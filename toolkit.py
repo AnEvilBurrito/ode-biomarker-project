@@ -92,8 +92,8 @@ class FeatureTransformer:
         self.transform_functions = {}
         self.selection_function = {}
 
-    def add_selection_function(self, name: str, selection_function, *args):
-        self.selection_function[name] = {'selection_function': selection_function, 'args': args}
+    def add_selection_function(self, name: str, selection_function, function_kwargs: dict = {}):
+        self.selection_function[name] = {'selection_function': selection_function, 'args': function_kwargs}
 
     def get_selection_function(self, name: str):
         return self.selection_function[name]['selection_function']
@@ -107,8 +107,8 @@ class FeatureTransformer:
     def remove_selection_function(self, name: str):
         self.selection_function.pop(name)
 
-    def add_transform_function(self, name: str, transform_function, *args):
-        self.transform_functions[name] = {'transform_function': transform_function, 'args': args}
+    def add_transform_function(self, name: str, transform_function, function_kwargs: dict = {}):
+        self.transform_functions[name] = {'transform_function': transform_function, 'args': function_kwargs}
     
     def get_transform_function(self, name: str):
         return self.transform_functions[name]['transform_function']
@@ -136,7 +136,7 @@ class FeatureTransformer:
         for name in self.transform_functions.keys():
             transform_function = self.get_transform_function(name)
             transform_args = self.get_transform_function_args(name)
-            X_train, y_train, X_test = transform_function(X_train, y_train, X_test, *transform_args)
+            X_train, y_train, X_test = transform_function(X_train, y_train, X_test, **transform_args)
         return X_train, y_train, X_test
     
     def run_selection_function(self, X_train, y_train, X_test):
@@ -155,7 +155,7 @@ class FeatureTransformer:
         for name in self.selection_function.keys():
             selection_function = self.get_selection_function(name)
             selection_args = self.get_selection_function_args(name)
-            selected_features, sel_train, sel_test = selection_function(X_train, y_train, X_test, *selection_args)
+            selected_features, sel_train, sel_test = selection_function(X_train, y_train, X_test, **selection_args)
         return selected_features, sel_train, sel_test
     
     def run(self, X_train, y_train, X_test):
@@ -610,8 +610,8 @@ def mrmr_select_fcq(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_ind
     return selected, successive_scores
 
 
-def enet_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
-    enet = ElasticNet(*args)
+def enet_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
+    enet = ElasticNet(kwargs)
     enet.fit(X,y)
     coef = enet.coef_
     abs_coef = np.abs(coef)
@@ -619,8 +619,8 @@ def enet_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
     return indices, coef[indices]
     
 
-def relieff_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
-    r = sr.RReliefF(n_features = k, *args)
+def relieff_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
+    r = sr.RReliefF(n_features = k, **kwargs)
     r.fit(X.to_numpy(), y.to_numpy())
     feat_indices = np.flip(np.argsort(r.w_), 0)[0:k]
     return feat_indices, r.w_[feat_indices]
@@ -640,6 +640,10 @@ def f_regression_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
     return selected_features, selector.scores_[selector.get_support()]
 
 def pearson_corr_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
+    pass 
+
+
+def variance_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
     pass 
 
 ### Selection functions
@@ -708,6 +712,10 @@ def impute_by_zero(X_train, y_train, X_test):
     return X_train, y_train, X_test
 
 ### Selection functions with imputation built-in 
+'''
+These functions are also selection functions, but they are not recommended
+as they are no longer compliant with the FeatureTransformer pattern.
+'''
 
 def impute_with_random_selection(X_train, y_train, X_test, n_features):
     X_train, y_train, X_test = impute_by_first_quantile(X_train, y_train, X_test)
