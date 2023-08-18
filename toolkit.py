@@ -38,6 +38,23 @@ from sklearn.feature_selection import SelectKBest, f_regression
 import shap 
 from sklearn.base import BaseEstimator, TransformerMixin
 
+import pandas as pd
+
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, LogisticRegression, Lasso, ElasticNet
+from sklearn.svm import LinearSVR, LinearSVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
+
+from sklearn.feature_selection import SelectKBest, f_regression, mutual_info_regression
+from sklearn.model_selection import KFold
+from sklearn.metrics import mean_squared_error, accuracy_score
+from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+from sklearn.base import clone
+import sklearn_relief as sr
+
 
 ## validation
 from sklearn.metrics import r2_score
@@ -73,6 +90,22 @@ class FirstQuantileImputer(BaseEstimator, TransformerMixin):
 class FeatureTransformer:
     def __init__(self):
         self.transform_functions = {}
+        self.selection_function = {}
+
+    def add_selection_function(self, name: str, selection_function, *args):
+        self.selection_function[name] = {'selection_function': selection_function, 'args': args}
+
+    def get_selection_function(self, name: str):
+        return self.selection_function[name]['selection_function']
+    
+    def get_selection_function_args(self, name: str):
+        return self.selection_function[name]['args']
+    
+    def get_selection_function_names(self):
+        return self.selection_function.keys()
+    
+    def remove_selection_function(self, name: str):
+        self.selection_function.pop(name)
 
     def add_transform_function(self, name: str, transform_function, *args):
         self.transform_functions[name] = {'transform_function': transform_function, 'args': args}
@@ -90,11 +123,48 @@ class FeatureTransformer:
         self.transform_functions.pop(name)
 
     def run_all_transform(self, X_train, y_train, X_test):
+        '''
+        Input:
+            X_train: pandas dataframe, training data
+            y_train: pandas series, training label
+            X_test: pandas dataframe, test data
+        Output:
+            X_train: pandas dataframe, the training data after all transform functions
+            y_train: pandas series, the training label after all transform functions
+            X_test: pandas dataframe, the test data after all transform functions
+        '''
         for name in self.transform_functions.keys():
             transform_function = self.get_transform_function(name)
             transform_args = self.get_transform_function_args(name)
             X_train, y_train, X_test = transform_function(X_train, y_train, X_test, *transform_args)
         return X_train, y_train, X_test
+    
+    def run_selection_function(self, X_train, y_train, X_test):
+        '''
+        Input:
+            X_train: pandas dataframe, training data
+            y_train: pandas series, training label
+            X_test: pandas dataframe, test data
+        Output:
+            selected_features: list of strings, the selected features, selected features should only be based on X_train
+                Strings are used instead of indices because it guarantees subset selection while maintain stability as 
+                the indices of the features may change after an feature selection function 
+            sel_train: pandas dataframe, the training data after feature selection
+            sel_test: pandas dataframe, the test data after feature selection
+        '''
+        for name in self.selection_function.keys():
+            selection_function = self.get_selection_function(name)
+            selection_args = self.get_selection_function_args(name)
+            selected_features, sel_train, sel_test = selection_function(X_train, y_train, X_test, *selection_args)
+        return selected_features, sel_train, sel_test
+    
+    def run(self, X_train, y_train, X_test):
+        '''
+        Simply run all the transform functions and selection functions
+        '''
+        X_train, y_train, X_test = self.run_all_transform(X_train, y_train, X_test)
+        selected_features, sel_train, sel_test = self.run_selection_function(X_train, y_train, X_test)
+        return selected_features, sel_train, sel_test
 
 class Toolkit:
 
@@ -115,13 +185,25 @@ class Toolkit:
         self.models_used = []
         self.model_identifier = []
         self.model_hyperparameters = []
-        self.rng_list = []
 
+        self.rng_list = []
         self.cv_split_size = 0.1 
         self.max_feature_save_size = 1000
         self.verbose = False
 
     def add_condition(self, condition, condition_to_get_feature_importance, matched_function, extra_args_for_function):
+        '''
+        Input:
+            condition: string, the condition to test, e.g. 'all', 'random', 'network'
+            condition_to_get_feature_importance: boolean, whether to get feature importance for this condition
+            matched_function: function, the function to use for feature selection
+                best practice is to use FeatureTransformer to wrap the function, call FeatureTransformer.run()
+            extra_args_for_function: tuple, the extra arguments to pass to the function
+        Example Usage:
+            `toolkit.add_condition('all', False, FeatureTransformer.run(), (,))`
+            The above example adds a condition called 'all', feature importance will not be calculated,
+            the feature selection function is FeatureTransformer.run(), and the extra arguments are empty 
+        '''
         self.conditions.append(condition)
         self.conditions_to_get_feature_importance.append(condition_to_get_feature_importance)
         self.matched_functions.append(matched_function)
@@ -469,6 +551,110 @@ def get_shap_values(model, model_str, train_data, test_data):
     shap_values = explainer.shap_values(test_data)
     return shap_values
 
+
+### Feature Selection Methods 
+'''
+All feature selection methods should take in the following arguments:
+    X: pandas dataframe | numpy array, the data to perform feature selection on
+    y: pandas series | numpy array, the label
+    k: int, the number of features to select
+    *args: extra arguments
+All feature selection methods should return the following:
+    selected_features: list of strings or list of ints representing the indices of the selected features
+    scores: list of floats | ints, the scores associated with each selected feature
+'''
+
+def mrmr_select_fcq(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_index=True):
+
+    # ------------ Input
+    # X: pandas.DataFrame, features
+    # y: pandas.Series, target variable
+    # K: number of features to select
+    
+    # ------------ Output
+    # feature_selected[List[Int]]: list of selected features index format 
+    # successive_scores[List[Float]]: list of successive scores
+
+    # compute F-statistics and initialize correlation matrix
+    F = pd.Series(f_regression(X, y)[0], index = X.columns)
+    corr = pd.DataFrame(.00001, index = X.columns, columns = X.columns)
+
+    # initialize list of selected features and list of excluded features
+    selected = []
+    successive_scores = []
+    not_selected = X.columns.to_list()
+
+    # repeat K times
+    for i in range(K):
+    
+        # compute (absolute) correlations between the last selected feature and all the (currently) excluded features
+        if i > 0:
+            last_selected = selected[-1]
+            corr.loc[not_selected, last_selected] = X[not_selected].corrwith(X[last_selected]).abs().clip(.00001)
+            
+        # compute FCQ score for all the (currently) excluded features
+        score = F.loc[not_selected] / corr.loc[not_selected, selected].mean(axis = 1).fillna(.00001)
+        
+        # find best feature, add it to selected and remove it from not_selected
+        best = score.index[score.argmax()]
+        successive_scores.append(score.max())
+        selected.append(best)
+        not_selected.remove(best)
+
+        if verbose == 1: 
+            print('Iteration', i+1, 'selected', best, 'score', score.max(), 'remaining', len(not_selected), 'features')
+    
+    if return_index:
+        return [X.columns.get_loc(c) for c in selected], successive_scores
+
+    return selected, successive_scores
+
+
+def enet_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
+    enet = ElasticNet(*args)
+    enet.fit(X,y)
+    coef = enet.coef_
+    abs_coef = np.abs(coef)
+    indices = np.flip(np.argsort(abs_coef), 0)[0:k]
+    return indices, coef[indices]
+    
+
+def relieff_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
+    r = sr.RReliefF(n_features = k, *args)
+    r.fit(X.to_numpy(), y.to_numpy())
+    feat_indices = np.flip(np.argsort(r.w_), 0)[0:k]
+    return feat_indices, r.w_[feat_indices]
+
+def rf_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
+    rf = RandomForestRegressor(*args)
+    rf.fit(X, y)
+    coef = rf.feature_importances_
+    indices = np.argsort(coef)[::-1][:k]
+    return indices, coef[indices]
+
+def f_regression_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
+    selector = SelectKBest(f_regression, k=k)
+    selector.fit(X, y)
+    # get the selected features
+    selected_features = X.columns[selector.get_support()]
+    return selected_features, selector.scores_[selector.get_support()]
+
+def pearson_corr_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
+    pass 
+
+### Selection functions
+'''
+All selection functions should take in the following arguments:
+    X_train: pandas dataframe, training data
+    y_train: pandas series, training label
+    X_test: pandas dataframe, test data
+    *args: extra arguments
+All selection functions should return the following:
+    selected_features: list of strings, the selected features, selected features should only be based on X_train
+    sel_train: pandas dataframe, the training data after feature selection
+    sel_test: pandas dataframe, the test data after feature selection
+'''
+
 def get_network_stat_features(X_train, y_train, X_test, nth_degree_neighbours, max_gene_target_disance, statistical_filter_size):
     network_features = nth_degree_neighbours[max_gene_target_disance]
     # perform feature selection on the training set
@@ -492,6 +678,19 @@ def get_preset_features(X_train, y_train, X_test, preset_features):
     sel_train, sel_test = X_train[preset_features], X_test[preset_features]
     return preset_features, sel_train, sel_test
 
+### Transforming functions 
+'''
+All transform functions should take in the following arguments:
+    X_train: pandas dataframe, training data
+    y_train: pandas series, training label
+    X_test: pandas dataframe, test data
+    *args: extra arguments
+All transform functions should return the following:
+    X_train: pandas dataframe, the training data after transformation
+    y_train: pandas series, the training label after transformation
+    X_test: pandas dataframe, the test data after transformation
+'''
+
 def impute_by_first_quantile(X_train, y_train, X_test):
     # fit the imputer
     imputer = FirstQuantileImputer()
@@ -507,6 +706,8 @@ def impute_by_zero(X_train, y_train, X_test):
     X_train = X_train.fillna(0)
     X_test = X_test.fillna(0)
     return X_train, y_train, X_test
+
+### Selection functions with imputation built-in 
 
 def impute_with_random_selection(X_train, y_train, X_test, n_features):
     X_train, y_train, X_test = impute_by_first_quantile(X_train, y_train, X_test)
@@ -533,7 +734,7 @@ def impute_with_preset_features(X_train, y_train, X_test, preset_features):
     features, sel_train, sel_test = get_preset_features(X_train, y_train, X_test, preset_features)
     return features, sel_train, sel_test
 
-    
+### Single machine learning model run function 
 
 def run_single_test(condition,
                     condition_to_get_feature_importance,
