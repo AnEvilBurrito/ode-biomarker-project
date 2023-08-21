@@ -611,7 +611,7 @@ def mrmr_select_fcq(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_ind
 
 
 def enet_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
-    enet = ElasticNet(kwargs)
+    enet = ElasticNet(**kwargs)
     enet.fit(X,y)
     coef = enet.coef_
     abs_coef = np.abs(coef)
@@ -619,14 +619,17 @@ def enet_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
     return indices, coef[indices]
     
 
-def relieff_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
-    r = sr.RReliefF(n_features = k, **kwargs)
+def relieff_select(X: pd.DataFrame, y: pd.Series, k: int, n_jobs=1):
+    if n_jobs >= 1:
+        r = sr.RReliefF(n_features = k, n_jobs = n_jobs)
+    else: 
+        r = sr.ReliefF(n_features = k)
     r.fit(X.to_numpy(), y.to_numpy())
     feat_indices = np.flip(np.argsort(r.w_), 0)[0:k]
     return feat_indices, r.w_[feat_indices]
 
-def rf_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
-    rf = RandomForestRegressor(*args)
+def rf_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
+    rf = RandomForestRegressor(**kwargs)
     rf.fit(X, y)
     coef = rf.feature_importances_
     indices = np.argsort(coef)[::-1][:k]
