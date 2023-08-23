@@ -1,3 +1,20 @@
 {
-    "python.analysis.typeCheckingMode": "off"
+    "python.analysis.typeCheckingMode": "off",
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "overrideName": true,
+            "icon": "terminal-powershell",
+            // "env": {
+            //   "TEST_VAR": "value"
+            // },
+            // -------
+            // this part is needed:
+            "args": [
+                "-ExecutionPolicy",
+                "Bypass"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
 }
