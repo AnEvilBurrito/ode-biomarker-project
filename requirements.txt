@@ -7,7 +7,6 @@ scipy==1.9.1
 seaborn==0.11.2
 shap==0.42.1
 sklearn_relief==1.0.0b2
-torch==2.0.1+cu117
 xgboost==1.7.5
 pipreqs
 pip-chill
