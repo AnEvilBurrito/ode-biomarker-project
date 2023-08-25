@@ -890,11 +890,13 @@ def run_bulk_test(conditions_to_test,
     
     return df
 
-def get_mean_contribution(df, condition='random', absolute_value=True, strict_mean=0.25):
+def get_mean_contribution(df, condition='random', absolute_value=True, strict_mean=0.25, adjust_for_accuracy=False):
     # df: dataframe with shap_values, X_train, X_test and a 'exp_condition' columns
     # extract all the shap values, match the feature names and store them in a dataframe
 
     # strict mean: feature must be present in at least x% of iterations
+    # adjust_for_accuracy: if True, the mean shap value is divided by the accuracy metric of the model 
+    # TODO: NOT IMPLEMENTED YET
 
     # for the df, select only the row with the exp_condition column == 'experimental'
     df = df[df['exp_condition'] == condition]
