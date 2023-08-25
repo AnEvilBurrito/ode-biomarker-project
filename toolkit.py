@@ -42,11 +42,6 @@ import pandas as pd
 
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression, LogisticRegression, Lasso, ElasticNet
-from sklearn.svm import LinearSVR, LinearSVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neural_network import MLPClassifier
 
 from sklearn.feature_selection import SelectKBest, f_regression, mutual_info_regression
 from sklearn.model_selection import KFold
@@ -449,7 +444,7 @@ class Toolkit:
                             rel_tol: float = 0.01, 
                             abs_tol: float = 0.001,
                             max_iter: int = 100,
-                            n_jobs=1, verbose=True, verbose_level=1):
+                            n_jobs=1, verbose=True, verbose_level=1, return_meta_df=False):
 
         
         
@@ -460,6 +455,7 @@ class Toolkit:
         current_contrib = 0 
         prev_contrib = 0
 
+        meta_results = []
         total_df = pd.DataFrame()
 
         while current_tol > rel_tol and abs_diff > abs_tol and len(rng_list) < max_iter:
@@ -503,7 +499,7 @@ class Toolkit:
                 prev_contrib = current_contrib
                 if verbose and verbose_level >= 1: 
                     print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, corr: {df["corr"].mean():2f}')
-                    
+                meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df['corr'].mean()])
             
         if verbose and verbose_level >= 0: 
             # display in one line 
@@ -518,7 +514,14 @@ class Toolkit:
 
             if len(rng_list) >= max_iter:
                 print(f'WARNING: Consensus Run under condition {condition} is not converged within {max_iter} iterations')
+        
+        # create a dataframe for meta results
+        
+        meta_df = pd.DataFrame(meta_results, columns=['iteration', 'current_tol', 'abs_diff', 'abs_prev', 'corr'])
 
+        if return_meta_df:
+            return rng_list, total_df, meta_df
+        
         return rng_list, total_df
 
 def get_model_from_string(model_name, **kwargs):
@@ -544,8 +547,9 @@ def get_shap_values(model, model_str, train_data, test_data):
         explainer = shap.LinearExplainer(model, train_data)
     elif model_str == 'XGBRegressor':
         explainer = shap.TreeExplainer(model, train_data)
-    elif model_str == 'MLPRegressor':
-        explainer = shap.DeepExplainer(model, train_data)
+    # TODO: tensorflow error for this one, fix
+    # elif model_str == 'MLPRegressor':
+    #     explainer = shap.DeepExplainer(model, train_data)
     else:
         explainer = shap.KernelExplainer(model.predict, train_data)
     shap_values = explainer.shap_values(test_data)

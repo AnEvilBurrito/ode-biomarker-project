@@ -1,5 +1,6 @@
 {
     "python.analysis.typeCheckingMode": "off",
+    "python.languageServer": "Pylance",
     "terminal.integrated.profiles.windows": {
         "PowerShell": {
             "source": "PowerShell",
