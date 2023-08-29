@@ -555,6 +555,82 @@ def get_shap_values(model, model_str, train_data, test_data):
     shap_values = explainer.shap_values(test_data)
     return shap_values
 
+### Hyperparameter Tuning of Models
+'''
+All hyperparameter tuning methods should take in the following arguments:
+    X: pandas dataframe | numpy array, the data to perform feature selection on
+    y: pandas series | numpy array, the label
+    cv: int, the number of folds for cross validation
+    n_jobs: int, the number of jobs to run in parallel, usually set to 1
+
+All feature selection methods should return the following:
+    params: dict, the best parameters for the model
+'''
+
+def hypertune_svr(X: pd.DataFrame, y: pd.Series, n_jobs=1):
+    '''
+    WARNING TODO: GPT generated code, not tested
+    Input:
+        X: pandas dataframe, the training data
+        y: pandas series, the training label
+    Output:
+        best_params: dict, the best parameters for the model
+    '''
+    from sklearn.model_selection import GridSearchCV
+    from sklearn.svm import SVR
+
+    # define the parameter values that should be searched
+    C_range = np.logspace(-2, 10, 13)
+    gamma_range = np.logspace(-9, 3, 13)
+    epsilon_range = np.logspace(-2, 10, 13)
+    param_grid = dict(gamma=gamma_range, C=C_range, epsilon=epsilon_range)
+
+    # instantiate and fit the grid
+    grid = GridSearchCV(SVR(kernel='rbf'), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
+    grid.fit(X, y)
+
+    # view the complete results
+    # print(grid.cv_results_)
+
+    # examine the best model
+    # print(grid.best_score_)
+    # print(grid.best_params_)
+
+    return grid.best_params_
+
+def hypertune_ann(X: pd.DataFrame, y: pd.Series, n_jobs=1):
+    '''
+    WARNING TODO: GPT generated code, not tested
+    Input:
+        X: pandas dataframe, the training data
+        y: pandas series, the training label
+    Output:
+        best_params: dict, the best parameters for the model
+    '''
+    from sklearn.model_selection import GridSearchCV
+    from sklearn.neural_network import MLPRegressor
+
+    # define the parameter values that should be searched
+    hidden_layer_sizes_range = [(i,) for i in range(1, 100)]
+    activation_range = ['identity', 'logistic', 'tanh', 'relu']
+    solver_range = ['lbfgs', 'sgd', 'adam']
+    alpha_range = np.logspace(-5, 3, 9)
+    learning_rate_range = ['constant', 'invscaling', 'adaptive']
+    param_grid = dict(hidden_layer_sizes=hidden_layer_sizes_range, activation=activation_range, solver=solver_range, alpha=alpha_range, learning_rate=learning_rate_range)
+
+    # instantiate and fit the grid
+    grid = GridSearchCV(MLPRegressor(), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
+    grid.fit(X, y)
+
+    # view the complete results
+    # print(grid.cv_results_)
+
+    # examine the best model
+    # print(grid.best_score_)
+    # print(grid.best_params_)
+
+    return grid.best_params_
+
 
 ### Feature Selection Methods 
 '''
@@ -652,6 +728,14 @@ def pearson_corr_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
 
 def variance_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
     pass 
+
+
+def wrapper_rfs_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
+    '''
+    
+    '''
+    pass 
+
 
 ### Selection functions
 '''
