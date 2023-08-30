@@ -160,6 +160,64 @@ class FeatureTransformer:
         X_train, y_train, X_test = self.run_all_transform(X_train, y_train, X_test)
         selected_features, sel_train, sel_test = self.run_selection_function(X_train, y_train, X_test)
         return selected_features, sel_train, sel_test
+    
+class Powerkit:
+
+    def __init__(self, feature_data: pd.DataFrame, label_data: pd.Series) -> None:
+        self.feature_data = feature_data
+        self.label_data = label_data
+
+        self.cv_split_size = 0.1
+        self.conditions = []
+        
+    def set_rng_list(self, rng_list):
+        self.rng_list = rng_list
+
+    def generate_rng_list(self, n_rng):
+        self.rng_list = np.random.randint(0, 100000, size=n_rng)
+
+    def _abstract_run_single(self, 
+                        condition: str,
+                        condition_to_get_feature_importance: bool,
+                        rng: int,
+                        pipeline_function: function,
+                        pipeline_args: dict, 
+                        eval_function: function,
+                        eval_args: dict,
+                        ):
+        
+        '''
+        enforces only on how the data is split and a generic df structure with 
+        the first column being 'condition'. 
+
+        The rest of the columns are up to the methods `pipeline_function` and `eval_function` to decide. They effectively make up the actual condition and additional return values.
+
+        pipeline function takes in the following arguments:
+            X_train: pandas dataframe, training data
+            y_train: pandas series, training label
+            pipeline_args: dict, the rest of the arguments
+
+        eval_function takes in the following arguments:
+            X_test: pandas dataframe, test data
+            y_test: pandas series, test label
+            eval_args: dict, the rest of the arguments
+
+        things should be returned for each run:
+            feature importance: a tuple, of (feature_name, score) for each feature which represents the relative importance of the feature   
+            model performance [OPTIONAL]: measured either by accuracy, correlation, etc, depending on the eval_function, if not provided, return None. 
+                model performance can be used to calculated an adjusted feature importance metric, e.g. by multiplying the feature importance by the model performance. It can also be used as a proxy to evaluate the generalizability of the model.
+
+        final return value:
+            results: dict = {'rng': rng, 'condition': condition, 'feature_importance': feature_importance, 'model_performance': model_performance}
+
+        '''
+        
+        X_train, X_test, y_train, y_test = train_test_split(self.feature_data, self.label_data, test_size=self.cv_split_size, random_state=rng)
+        
+        raise NotImplementedError
+    
+    def _abstract_run(self, rng_list: list, n_jobs: int, verbose: bool):
+        pass 
 
 class Toolkit:
 
@@ -172,9 +230,9 @@ class Toolkit:
         self.feature_data = feature_data
         self.label_data = label_data
         
-        self.conditions = []
-        self.conditions_to_get_feature_importance = []
-        self.matched_functions = []
+        self.conditions = [], # each element: string, e.g. 'all', 'random', 'network'
+        self.conditions_to_get_feature_importance = [] # each element: bool, True or False
+        self.matched_functions = [] # each element: function, the function to use for feature selection
         self.extra_args_for_functions = []
 
         self.models_used = []
@@ -214,6 +272,8 @@ class Toolkit:
 
     def generate_rng_list(self, n_rng):
         self.rng_list = np.random.randint(0, 100000, size=n_rng)
+
+
 
     def _generic_run_single(self,
                             condition,
@@ -735,6 +795,12 @@ def wrapper_rfs_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
     
     '''
     pass 
+
+def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int, model: BaseEstimator, **kwargs):
+    '''
+    
+    '''
+    pass
 
 
 ### Selection functions
