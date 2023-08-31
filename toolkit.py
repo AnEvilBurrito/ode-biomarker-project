@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 ## python imports
 import pickle
 import logging, sys # for logging
+from typing import Callable
+
 from joblib import Parallel, delayed # for parallel processing
 
 # external imports
@@ -168,8 +170,33 @@ class Powerkit:
         self.label_data = label_data
 
         self.cv_split_size = 0.1
-        self.conditions = []
+        self.conditions = {} # dict of dict obj, dict has the following structure: 
+                             # {
+                             # 'condition': str, 
+                             # 'condition_to_get_feature_importance': bool, 
+                             # 'pipeline_function': Callable, 
+                             # 'pipeline_args': dict, 
+                             # 'eval_function': Callable, 
+                             # 'eval_args': dict
+                             # }
+
+    def add_condition(self, condition: str, get_importance: bool, pipeline_function: Callable, pipeline_args: dict, eval_function: Callable, eval_args: dict):
+        # if condition already exists, raise error
+        if condition in self.conditions.keys():
+            raise ValueError(f'condition {condition} already exists')
+        self.conditions[condition] = {'condition': condition, 
+                                    'condition_to_get_feature_importance': get_importance, 
+                                    'pipeline_function': pipeline_function, 
+                                    'pipeline_args': pipeline_args, 
+                                    'eval_function': eval_function, 
+                                    'eval_args': eval_args}
         
+    def remove_condition(self, condition: str):
+        # if condition does not exist, raise error
+        if condition not in self.conditions.keys():
+            raise ValueError(f'condition {condition} does not exist')
+        self.conditions.pop(condition)
+
     def set_rng_list(self, rng_list):
         self.rng_list = rng_list
 
@@ -180,9 +207,9 @@ class Powerkit:
                         condition: str,
                         condition_to_get_feature_importance: bool,
                         rng: int,
-                        pipeline_function: function,
+                        pipeline_function: Callable,
                         pipeline_args: dict, 
-                        eval_function: function,
+                        eval_function: Callable,
                         eval_args: dict,
                         ):
         
@@ -197,10 +224,15 @@ class Powerkit:
             y_train: pandas series, training label
             pipeline_args: dict, the rest of the arguments
 
+        it's possible that eval_function require information from pipeline_function. Usually it is a trained model. 
+        In which case the pipeline_function must return a dict variable called `pipeline_components` 
+        which contains the information needed for eval_function
+            
         eval_function takes in the following arguments:
             X_test: pandas dataframe, test data
             y_test: pandas series, test label
-            eval_args: dict, the rest of the arguments
+            eval_args: dict | None, the rest of the arguments
+            pipeline_components: dict | None, the information needed for eval_function, if not needed, eval_info is None
 
         things should be returned for each run:
             feature importance: a tuple, of (feature_name, score) for each feature which represents the relative importance of the feature   
@@ -218,6 +250,19 @@ class Powerkit:
     
     def _abstract_run(self, rng_list: list, n_jobs: int, verbose: bool):
         pass 
+
+        
+
+### pipeline functions 
+'''
+
+'''
+
+
+### evaluation functions 
+'''
+
+'''
 
 class Toolkit:
 
