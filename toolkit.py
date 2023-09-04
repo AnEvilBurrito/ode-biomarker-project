@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 ## python imports
 import pickle
 import logging, sys # for logging
+from typing import Callable
+
 from joblib import Parallel, delayed # for parallel processing
 
 # external imports
@@ -160,6 +162,107 @@ class FeatureTransformer:
         X_train, y_train, X_test = self.run_all_transform(X_train, y_train, X_test)
         selected_features, sel_train, sel_test = self.run_selection_function(X_train, y_train, X_test)
         return selected_features, sel_train, sel_test
+    
+class Powerkit:
+
+    def __init__(self, feature_data: pd.DataFrame, label_data: pd.Series) -> None:
+        self.feature_data = feature_data
+        self.label_data = label_data
+
+        self.cv_split_size = 0.1
+        self.conditions = {} # dict of dict obj, dict has the following structure: 
+                             # {
+                             # 'condition': str, 
+                             # 'condition_to_get_feature_importance': bool, 
+                             # 'pipeline_function': Callable, 
+                             # 'pipeline_args': dict, 
+                             # 'eval_function': Callable, 
+                             # 'eval_args': dict
+                             # }
+
+    def add_condition(self, condition: str, get_importance: bool, pipeline_function: Callable, pipeline_args: dict, eval_function: Callable, eval_args: dict):
+        # if condition already exists, raise error
+        if condition in self.conditions.keys():
+            raise ValueError(f'condition {condition} already exists')
+        self.conditions[condition] = {'condition': condition, 
+                                    'condition_to_get_feature_importance': get_importance, 
+                                    'pipeline_function': pipeline_function, 
+                                    'pipeline_args': pipeline_args, 
+                                    'eval_function': eval_function, 
+                                    'eval_args': eval_args}
+        
+    def remove_condition(self, condition: str):
+        # if condition does not exist, raise error
+        if condition not in self.conditions.keys():
+            raise ValueError(f'condition {condition} does not exist')
+        self.conditions.pop(condition)
+
+    def set_rng_list(self, rng_list):
+        self.rng_list = rng_list
+
+    def generate_rng_list(self, n_rng):
+        self.rng_list = np.random.randint(0, 100000, size=n_rng)
+
+    def _abstract_run_single(self, 
+                        condition: str,
+                        condition_to_get_feature_importance: bool,
+                        rng: int,
+                        pipeline_function: Callable,
+                        pipeline_args: dict, 
+                        eval_function: Callable,
+                        eval_args: dict,
+                        ):
+        
+        '''
+        enforces only on how the data is split and a generic df structure with 
+        the first column being 'condition'. 
+
+        The rest of the columns are up to the methods `pipeline_function` and `eval_function` to decide. They effectively make up the actual condition and additional return values.
+
+        pipeline function takes in the following arguments:
+            X_train: pandas dataframe, training data
+            y_train: pandas series, training label
+            pipeline_args: dict, the rest of the arguments
+
+        it's possible that eval_function require information from pipeline_function. Usually it is a trained model. 
+        In which case the pipeline_function must return a dict variable called `pipeline_components` 
+        which contains the information needed for eval_function
+            
+        eval_function takes in the following arguments:
+            X_test: pandas dataframe, test data
+            y_test: pandas series, test label
+            eval_args: dict | None, the rest of the arguments
+            pipeline_components: dict | None, the information needed for eval_function, if not needed, eval_info is None
+
+        things should be returned for each run:
+            feature importance: a tuple, of (feature_name, score) for each feature which represents the relative importance of the feature   
+            model performance [OPTIONAL]: measured either by accuracy, correlation, etc, depending on the eval_function, if not provided, return None. 
+                model performance can be used to calculated an adjusted feature importance metric, e.g. by multiplying the feature importance by the model performance. It can also be used as a proxy to evaluate the generalizability of the model.
+
+        final return value:
+            results: dict = {'rng': rng, 'condition': condition, 'feature_importance': feature_importance, 'model_performance': model_performance}
+
+        '''
+        
+        X_train, X_test, y_train, y_test = train_test_split(self.feature_data, self.label_data, test_size=self.cv_split_size, random_state=rng)
+        
+        raise NotImplementedError
+    
+    def _abstract_run(self, rng_list: list, n_jobs: int, verbose: bool):
+        pass 
+
+        
+
+### pipeline functions 
+'''
+
+'''
+
+
+### evaluation functions 
+'''
+
+'''
 
 class Toolkit:
 
@@ -172,9 +275,9 @@ class Toolkit:
         self.feature_data = feature_data
         self.label_data = label_data
         
-        self.conditions = []
-        self.conditions_to_get_feature_importance = []
-        self.matched_functions = []
+        self.conditions = [], # each element: string, e.g. 'all', 'random', 'network'
+        self.conditions_to_get_feature_importance = [] # each element: bool, True or False
+        self.matched_functions = [] # each element: function, the function to use for feature selection
         self.extra_args_for_functions = []
 
         self.models_used = []
@@ -214,6 +317,8 @@ class Toolkit:
 
     def generate_rng_list(self, n_rng):
         self.rng_list = np.random.randint(0, 100000, size=n_rng)
+
+
 
     def _generic_run_single(self,
                             condition,
@@ -555,6 +660,82 @@ def get_shap_values(model, model_str, train_data, test_data):
     shap_values = explainer.shap_values(test_data)
     return shap_values
 
+### Hyperparameter Tuning of Models
+'''
+All hyperparameter tuning methods should take in the following arguments:
+    X: pandas dataframe | numpy array, the data to perform feature selection on
+    y: pandas series | numpy array, the label
+    cv: int, the number of folds for cross validation
+    n_jobs: int, the number of jobs to run in parallel, usually set to 1
+
+All feature selection methods should return the following:
+    params: dict, the best parameters for the model
+'''
+
+def hypertune_svr(X: pd.DataFrame, y: pd.Series, n_jobs=1):
+    '''
+    WARNING TODO: GPT generated code, not tested
+    Input:
+        X: pandas dataframe, the training data
+        y: pandas series, the training label
+    Output:
+        best_params: dict, the best parameters for the model
+    '''
+    from sklearn.model_selection import GridSearchCV
+    from sklearn.svm import SVR
+
+    # define the parameter values that should be searched
+    C_range = np.logspace(-2, 10, 13)
+    gamma_range = np.logspace(-9, 3, 13)
+    epsilon_range = np.logspace(-2, 10, 13)
+    param_grid = dict(gamma=gamma_range, C=C_range, epsilon=epsilon_range)
+
+    # instantiate and fit the grid
+    grid = GridSearchCV(SVR(kernel='rbf'), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
+    grid.fit(X, y)
+
+    # view the complete results
+    # print(grid.cv_results_)
+
+    # examine the best model
+    # print(grid.best_score_)
+    # print(grid.best_params_)
+
+    return grid.best_params_
+
+def hypertune_ann(X: pd.DataFrame, y: pd.Series, n_jobs=1):
+    '''
+    WARNING TODO: GPT generated code, not tested
+    Input:
+        X: pandas dataframe, the training data
+        y: pandas series, the training label
+    Output:
+        best_params: dict, the best parameters for the model
+    '''
+    from sklearn.model_selection import GridSearchCV
+    from sklearn.neural_network import MLPRegressor
+
+    # define the parameter values that should be searched
+    hidden_layer_sizes_range = [(i,) for i in range(1, 100)]
+    activation_range = ['identity', 'logistic', 'tanh', 'relu']
+    solver_range = ['lbfgs', 'sgd', 'adam']
+    alpha_range = np.logspace(-5, 3, 9)
+    learning_rate_range = ['constant', 'invscaling', 'adaptive']
+    param_grid = dict(hidden_layer_sizes=hidden_layer_sizes_range, activation=activation_range, solver=solver_range, alpha=alpha_range, learning_rate=learning_rate_range)
+
+    # instantiate and fit the grid
+    grid = GridSearchCV(MLPRegressor(), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
+    grid.fit(X, y)
+
+    # view the complete results
+    # print(grid.cv_results_)
+
+    # examine the best model
+    # print(grid.best_score_)
+    # print(grid.best_params_)
+
+    return grid.best_params_
+
 
 ### Feature Selection Methods 
 '''
@@ -652,6 +833,20 @@ def pearson_corr_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
 
 def variance_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
     pass 
+
+
+def wrapper_rfs_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
+    '''
+    
+    '''
+    pass 
+
+def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int, model: BaseEstimator, **kwargs):
+    '''
+    
+    '''
+    pass
+
 
 ### Selection functions
 '''
