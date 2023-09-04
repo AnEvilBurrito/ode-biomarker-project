@@ -86,6 +86,10 @@ class FirstQuantileImputer(BaseEstimator, TransformerMixin):
 
 class FeatureTransformer:
     def __init__(self):
+        '''
+        chains a series of transform functions and selection functions together,
+        with the assumption that the transform/selection functions are independent of each other
+        '''
         self.transform_functions = {}
         self.selection_function = {}
 
@@ -119,7 +123,7 @@ class FeatureTransformer:
     def remove_transform_function(self, name: str):
         self.transform_functions.pop(name)
 
-    def run_all_transform(self, X_train, y_train, X_test):
+    def run_all_transform(self, X_train, y_train):
         '''
         Input:
             X_train: pandas dataframe, training data
@@ -133,10 +137,10 @@ class FeatureTransformer:
         for name in self.transform_functions.keys():
             transform_function = self.get_transform_function(name)
             transform_args = self.get_transform_function_args(name)
-            X_train, y_train, X_test = transform_function(X_train, y_train, X_test, **transform_args)
-        return X_train, y_train, X_test
+            X_train, y_train = transform_function(X_train, y_train, **transform_args)
+        return X_train, y_train
     
-    def run_selection_function(self, X_train, y_train, X_test):
+    def run_selection_function(self, X_train, y_train):
         '''
         Input:
             X_train: pandas dataframe, training data
@@ -152,16 +156,16 @@ class FeatureTransformer:
         for name in self.selection_function.keys():
             selection_function = self.get_selection_function(name)
             selection_args = self.get_selection_function_args(name)
-            selected_features, sel_train, sel_test = selection_function(X_train, y_train, X_test, **selection_args)
-        return selected_features, sel_train, sel_test
+            selected_features, sel_train = selection_function(X_train, y_train, **selection_args)
+        return selected_features, sel_train
     
-    def run(self, X_train, y_train, X_test):
+    def run(self, X_train, y_train):
         '''
         Simply run all the transform functions and selection functions
         '''
-        X_train, y_train, X_test = self.run_all_transform(X_train, y_train, X_test)
-        selected_features, sel_train, sel_test = self.run_selection_function(X_train, y_train, X_test)
-        return selected_features, sel_train, sel_test
+        X_train, y_train = self.run_all_transform(X_train, y_train)
+        selected_features, sel_train = self.run_selection_function(X_train, y_train)
+        return selected_features, sel_train
     
 class Powerkit:
 
@@ -851,17 +855,19 @@ def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int, model: Base
 ### Selection functions
 '''
 All selection functions should take in the following arguments:
-    X_train: pandas dataframe, training data
-    y_train: pandas series, training label
-    X_test: pandas dataframe, test data
+    X: pandas dataframe, training data
+    y: pandas series, training label
     *args: extra arguments
 All selection functions should return the following:
     selected_features: list of strings, the selected features, selected features should only be based on X_train
-    sel_train: pandas dataframe, the training data after feature selection
-    sel_test: pandas dataframe, the test data after feature selection
+    selected_X: pandas dataframe, the training data after feature selection
 '''
 
 def get_network_stat_features(X_train, y_train, X_test, nth_degree_neighbours, max_gene_target_disance, statistical_filter_size):
+    '''
+    TODO: Plan for deprecation, this function is not compliant with FeatureTransformer pattern
+    WARNING: nests two selection functions together, this is not recommended. 
+    '''
     network_features = nth_degree_neighbours[max_gene_target_disance]
     # perform feature selection on the training set
     selector = SelectKBest(f_regression, k=statistical_filter_size)
@@ -872,32 +878,70 @@ def get_network_stat_features(X_train, y_train, X_test, nth_degree_neighbours, m
     return selected_features, sel_train, sel_test
 
 def get_random_features(X_train, y_train, X_test, selection_size):
+    '''
+    TODO: Plan for deprecation, this function is not compliant with FeatureTransformer pattern
+    '''
+
     random_features = np.random.choice(X_train.columns, selection_size, replace=False)
     sel_train, sel_test = X_train[random_features], X_test[random_features]
     return random_features, sel_train, sel_test
 
 def get_all_features(X_train, y_train, X_test):
+    '''
+    TODO: Plan for deprecation, this function is not compliant with FeatureTransformer pattern
+    '''
     sel_train, sel_test = X_train, X_test
     return None, sel_train, sel_test
 
 def get_preset_features(X_train, y_train, X_test, preset_features):
+    '''
+    TODO: Plan for deprecation, this function is not compliant with FeatureTransformer pattern
+    '''
     sel_train, sel_test = X_train[preset_features], X_test[preset_features]
     return preset_features, sel_train, sel_test
+
+def select_stat_features(X_train, y_train, selection_size):
+    '''
+    Select based on f-regression
+    '''
+    # perform feature selection on the training set
+    selector = SelectKBest(f_regression, k=selection_size)
+    selector.fit(X_train, y_train)
+    # get the selected features
+    selected_features = X_train.columns[selector.get_support()]
+    sel_train = X_train[selected_features]
+    return selected_features, sel_train
+
+def select_preset_features(X_train, y_train, preset_features):
+    '''
+    Select based on preset features
+    '''
+    sel_train = X_train[preset_features]
+    return preset_features, sel_train
+
+def select_random_features(X_train, y_train, selection_size):
+    '''
+    Select based on random features
+    '''
+    random_features = np.random.choice(X_train.columns, selection_size, replace=False)
+    sel_train = X_train[random_features]
+    return random_features, sel_train
 
 ### Transforming functions 
 '''
 All transform functions should take in the following arguments:
-    X_train: pandas dataframe, training data
-    y_train: pandas series, training label
-    X_test: pandas dataframe, test data
+    X: pandas dataframe, training data
+    y: pandas series, training label
     *args: extra arguments
 All transform functions should return the following:
-    X_train: pandas dataframe, the training data after transformation
-    y_train: pandas series, the training label after transformation
-    X_test: pandas dataframe, the test data after transformation
+    X: pandas dataframe, the training data after transformation
+    y: pandas series, the training label after transformation
 '''
 
 def impute_by_first_quantile(X_train, y_train, X_test):
+    '''
+    TODO: Plan for deprecation, this function is not compliant with the Tranforming functions pattern
+    '''
     # fit the imputer
     imputer = FirstQuantileImputer()
     imputer.fit(X_train)
@@ -909,9 +953,22 @@ def impute_by_first_quantile(X_train, y_train, X_test):
     return X_train, y_train, X_test
 
 def impute_by_zero(X_train, y_train, X_test):
+    '''
+    TODO: Plan for deprecation, this function is not compliant with the Tranforming functions pattern
+    '''
     X_train = X_train.fillna(0)
     X_test = X_test.fillna(0)
     return X_train, y_train, X_test
+
+def transform_impute_by_zero(X, y):
+    X = X.fillna(0)
+    return X, y
+
+def transform_impute_by_first_quantile(X, y):
+    imputer = FirstQuantileImputer()
+    imputer.fit(X)
+    X = imputer.transform(X, return_df=True)
+    return X, y
 
 ### Selection functions with imputation built-in 
 '''

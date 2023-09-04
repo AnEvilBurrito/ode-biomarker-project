@@ -4,6 +4,20 @@ class PathLoader:
     
     def __init__(self, config_path, current_user_path) -> None:
         
+        '''
+        
+        Wrapper class for loading data path and dir path from a set of config files,
+        allowing multiple machines to have shared access to arbitrary data paths.
+        
+        data config file format:
+        DATA_PATH~user1 = 'path1'
+        DATA_PATH~user2 = 'path2'
+        ... 
+        
+        current user file format:
+        CURRENT_USER = user1
+        '''
+        
         self.config_path = config_path
         self.current_user_path = current_user_path
         
