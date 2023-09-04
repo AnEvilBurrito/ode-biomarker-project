@@ -931,6 +931,62 @@ def get_mean_contribution(df, condition='random', absolute_value=True, strict_me
 
     return mean_shap_values_df
 
+def get_mean_contribution_general(scores, strict_mean=0.25, adjust_for_accuracy=False, accuracy_scores=None):
+    '''
+    Sums up the mean score values for each feature, and returns a dataframe with the feature names and the mean score values
+    Input:
+        scores: iterable with a tuple of (iteration_no, feature_names, scores)
+        strict mean: feature must be present in at least x% of iterations
+        adjust_for_accuracy: if True, the mean shap value is divided by the accuracy metric of the model
+        accuracy scores must be provided if adjust_for_accuracy is True
+        accuracy_scores: iterable with a tuple of (feature_names, accuracy_scores)  
+    Output: 
+        mean_scores_df: dataframe with feature names and mean scores, sorted by mean scores
+            col 1: feature_names
+            col 2: mean scores
+            col 3: count of feature_names
+    '''
+    
+    # if obj has attr shape, it is treated as a dataframe
+    if hasattr(scores, 'shape'): 
+        df = scores.copy()
+    else: 
+        df = pd.DataFrame(scores, columns=['iteration_no', 'feature_names', 'scores'])
+        
+    # get the mean scores for each feature
+    mean_scores_df = df.groupby('feature_names').mean()
+    
+    if adjust_for_accuracy: 
+        
+        assert accuracy_scores is not None, 'accuracy_scores must be provided if adjust_for_accuracy is True'
+        
+        # get the accuracy scores for each feature
+        accuracy_scores_df = pd.DataFrame(accuracy_scores, columns=['feature_names', 'accuracy_scores'])
+        
+        # join the accuracy scores to the mean scores
+        mean_scores_df = mean_scores_df.join(accuracy_scores_df.set_index('feature_names'), on='feature_names')
+        
+        # divide the mean scores by the accuracy scores
+        mean_scores_df['scores'] = mean_scores_df['scores'] / mean_scores_df['accuracy_scores']
+        
+        # drop the accuracy scores column
+        mean_scores_df.drop(columns=['accuracy_scores'], inplace=True)
+    
+    # get the count of each feature
+    feature_count = df.groupby('feature_names').count()
+    
+    # join the count to the mean scores
+    mean_scores_df['count'] = feature_count['scores']
+    
+    # filter out features that are not present in at least x% of iterations
+    mean_scores_df = mean_scores_df[mean_scores_df['count'] >= df.shape[0] * strict_mean]
+    
+    # sort by mean scores
+    mean_scores_df.sort_values(by='scores', ascending=False, inplace=True)
+    
+    return mean_scores_df    
+    
+    
 def get_diff_between_feature_contributions(shap_df1: pd.DataFrame, shap_df2: pd.DataFrame):
     # compute the difference in mean shap values for each feature
     diff = shap_df2.copy()
