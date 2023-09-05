@@ -201,11 +201,9 @@ class Powerkit:
             raise ValueError(f'condition {condition} does not exist')
         self.conditions.pop(condition)
 
-    def set_rng_list(self, rng_list):
-        self.rng_list = rng_list
-
     def generate_rng_list(self, n_rng):
-        self.rng_list = np.random.randint(0, 100000, size=n_rng)
+        rng_list = np.random.randint(0, 100000, size=n_rng)
+        return rng_list
 
     def _abstract_run_single(self, 
                         condition: str,
@@ -215,6 +213,7 @@ class Powerkit:
                         pipeline_args: dict, 
                         eval_function: Callable,
                         eval_args: dict,
+                        verbose: bool = False
                         ):
         
         '''
@@ -247,15 +246,91 @@ class Powerkit:
             results: dict = {'rng': rng, 'condition': condition, 'feature_importance': feature_importance, 'model_performance': model_performance}
 
         '''
+        # initialize the final returns
+        final_returns = {}
+        final_returns['rng'] = rng
+        final_returns['condition'] = condition
         
+        # split the data and go through the pipeline
         X_train, X_test, y_train, y_test = train_test_split(self.feature_data, self.label_data, test_size=self.cv_split_size, random_state=rng)
+        pipeline_comps = pipeline_function(X_train, y_train, **pipeline_args)
+        eval_returns = eval_function(X_test, y_test, pipeline_components=pipeline_comps, **eval_args)
         
-        raise NotImplementedError
+        # update the final returns
+        final_returns.update(eval_returns)
+        if not condition_to_get_feature_importance:
+            final_returns.pop('feature_importance')
+        
+        return final_returns
     
-    def _abstract_run(self, rng_list: list, n_jobs: int, verbose: bool):
-        pass 
-
+    def _abstract_run(self, rng_list: list, n_jobs: int, verbose: bool = False, conditions=None):
         
+        if conditions is None:
+            conditions = self.conditions
+        
+        if n_jobs == 1:
+            # use normal loop syntax for verbose printing
+            data_collector = []
+            for rng in rng_list:
+                for condition in self.conditions.keys():
+                    data = self._abstract_run_single(condition,
+                                                    self.conditions[condition]['condition_to_get_feature_importance'],
+                                                    rng,
+                                                    self.conditions[condition]['pipeline_function'],
+                                                    self.conditions[condition]['pipeline_args'],
+                                                    self.conditions[condition]['eval_function'],
+                                                    self.conditions[condition]['eval_args'],
+                                                    verbose=verbose
+                                                    )
+                    data_collector.append(data)
+        else:
+            # use joblib to parallelize the process, disable verbose printing
+            data_collector = Parallel(n_jobs=n_jobs)(delayed(self._abstract_run_single)(condition,
+                                                    self.conditions[condition]['condition_to_get_feature_importance'],
+                                                    rng,
+                                                    self.conditions[condition]['pipeline_function'],
+                                                    self.conditions[condition]['pipeline_args'],
+                                                    self.conditions[condition]['eval_function'],
+                                                    self.conditions[condition]['eval_args'],
+                                                    verbose=False
+                                                    ) 
+                                                    for rng in rng_list
+                                                    for condition in self.conditions.keys())
+            
+        df = pd.DataFrame(data_collector)
+        return df
+    
+    def run_all_conditions(self, rng_list: list, n_jobs: int, verbose: bool = False):
+        df = self._abstract_run(rng_list, n_jobs, verbose)
+        return df
+    
+    def run_selected_condition(self, condition: str, rng_list: list, n_jobs: int, verbose: bool = False):
+        if condition not in self.conditions.keys():
+            raise ValueError(f'condition {condition} does not exist')
+        df = self._abstract_run(rng_list, n_jobs, verbose, conditions=[condition])
+        return df
+    
+    def run_until_consensus(self, condition: str, 
+                            rel_tol: float = 0.01, abs_tol: float = 0.001, max_iter: int = 100, use_std: bool = False,
+                            n_jobs: int = 1, verbose: bool = False, verbose_level: int = 1, return_meta_df: bool = False):
+        
+        '''
+        Input: 
+            condition: str, the condition to run
+            rel_tol: float, the relative tolerance to use for consensus run
+            abs_tol: float, the absolute tolerance to use for consensus run
+            max_iter: int, the maximum number of iterations to run
+            use_std: bool, whether to use standard deviation as the metric for consensus run, if False, use average absolute difference
+            n_jobs: int, the number of jobs to use for parallel processing
+            verbose: bool, whether to print verbose information
+            verbose_level: int, the level of verbose information to print, 0 for no verbose, 1 for basic information, 2 for intermediate information, 3 for all information
+            return_meta_df: bool, whether to return the meta dataframe which contains the information for each iteration
+        Output:
+            rng_list: list of int, the rng list used for consensus run
+            total_df: pandas dataframe, the dataframe containing the results for each iteration
+            meta_df: pandas dataframe, the dataframe containing the meta information for each iteration, only returned if return_meta_df is True
+        '''
+        pass 
 
 ### pipeline functions 
 '''
