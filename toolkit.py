@@ -912,7 +912,7 @@ def select_stat_features(X_train, y_train, selection_size):
     sel_train = X_train[selected_features]
     return selected_features, sel_train
 
-def select_preset_features(X_train, y_train, preset_features):
+def select_preset_features(X_train, y_train, preset_features: pd.Index):
     '''
     Select based on preset features
     '''
