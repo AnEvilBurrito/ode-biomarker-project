@@ -330,7 +330,82 @@ class Powerkit:
             total_df: pandas dataframe, the dataframe containing the results for each iteration
             meta_df: pandas dataframe, the dataframe containing the meta information for each iteration, only returned if return_meta_df is True
         '''
-        pass 
+    
+        rng_list = []
+
+        current_tol = 1e10 
+        abs_diff = 1e10
+        current_contrib = 0 
+        prev_contrib = 0
+
+        meta_results = []
+        total_df = pd.DataFrame()
+
+        while current_tol > rel_tol and abs_diff > abs_tol and len(rng_list) < max_iter:
+            
+            rng = np.random.randint(0, 10000000)
+            rng_list.append(rng)
+
+            rng_list_to_run = [rng]
+            if verbose and verbose_level >= 3:
+                print(f'running condition {condition} with rng {rng}')
+            verbose_at_run = False
+            if verbose and verbose_level >= 2:
+                verbose_at_run = True
+            df = self.run_selected_condition(condition, rng_list=rng_list_to_run, n_jobs=n_jobs, verbose=verbose_at_run)
+            if verbose and verbose_level >= 3:
+                print(f'finished running condition {condition} with rng {rng}')
+            if df is None:
+                raise ValueError(f'no df is returned for condition {condition}')
+            else: 
+                total_df = pd.concat([total_df, df], axis=0)
+            if verbose and verbose_level >= 3:
+                print(f'finished concatenating df for condition {condition} with rng {rng}')
+
+            if isinstance(prev_contrib, int):
+                if verbose and verbose_level >= 3:
+                    print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
+                prev_contrib = get_mean_contribution(total_df, condition, absolute_value=True, strict_mean=0)
+                # strict mean = 0, sum only at the end
+            else:
+                current_contrib = get_mean_contribution(total_df, condition, absolute_value=True, strict_mean=0)
+                # print the first five features in one line by converting to list
+                if verbose and verbose_level >= 1:
+                    print(f'current_contrib: {list(current_contrib.index[:5])}')
+                if verbose and verbose_level >= 3:
+                    # print(f'{prev_contrib}, {current_contrib}')
+                    print(f'total abs prev: {get_abs_sum_for_feature_contributions(prev_contrib)}, total abs current: {get_abs_sum_for_feature_contributions(current_contrib)}')
+                diff = get_diff_between_feature_contributions(current_contrib, prev_contrib)
+                abs_diff = get_abs_sum_for_feature_contributions(diff)
+                abs_prev = get_abs_sum_for_feature_contributions(prev_contrib)
+                current_tol = 1 - (abs_prev - abs_diff) / abs_prev
+                prev_contrib = current_contrib
+                if verbose and verbose_level >= 1: 
+                    print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, corr: {df["corr"].mean():2f}')
+                meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df['corr'].mean()])
+            
+        if verbose and verbose_level >= 0: 
+            # display in one line 
+            print(f'Consensus Run: condition {condition} is done in {len(rng_list)} iterations')
+
+            if current_tol >= rel_tol:
+                print(f'Consensus Run under condition {condition} is NOT converged within {rel_tol} relative tolerance')
+
+            if abs_diff >= abs_tol:
+                print(f'Consensus Run under condition {condition} is NOT converged within {abs_tol} absolute tolerance')
+
+
+            if len(rng_list) >= max_iter:
+                print(f'WARNING: Consensus Run under condition {condition} is not converged within {max_iter} iterations')
+        
+        # create a dataframe for meta results
+        
+        meta_df = pd.DataFrame(meta_results, columns=['iteration', 'current_tol', 'abs_diff', 'abs_prev', 'corr'])
+
+        if return_meta_df:
+            return rng_list, total_df, meta_df
+        
+        return rng_list, total_df
 
 ### pipeline functions 
 '''
