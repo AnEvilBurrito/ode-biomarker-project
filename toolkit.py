@@ -310,6 +310,36 @@ class Powerkit:
         df = self._abstract_run(rng_list, n_jobs, verbose, conditions=[condition])
         return df
     
+    def get_mean_contribution(self, df, col_name='feature_importance', adjust_for_accuracy=False, accuracy_col_name='model_performance', **kwargs):
+        
+        feature_importance = df[col_name]
+        rngs = df['rng']
+        accuracies = df[accuracy_col_name]
+
+        data_collector = []
+
+        # for each row in the feature importance column, append tuple (feature_name, score) to a list
+        accuracy_tuples = []
+        for fi_row, rng_row, accuracies in zip(feature_importance, rngs, accuracies):
+            for feature_name, score in zip(fi_row[0], fi_row[1]):
+                data_collector.append({'iteration_no': rng_row, 'feature_names': feature_name, 'scores': score})
+                if adjust_for_accuracy:
+                    accuracy_tuples.append((feature_name, accuracies))
+
+        # convert the list to a dataframe
+        feature_importance_df = pd.DataFrame(data_collector)
+
+        # if adjust_for_accuracy is False, set accuracy_tuples to None
+        if not adjust_for_accuracy:
+            accuracy_tuples = None
+
+        # calculate the mean contribution for each feature
+        contribution = get_mean_contribution_general(feature_importance_df, adjust_for_accuracy=adjust_for_accuracy, accuracy_scores=accuracy_tuples, **kwargs)
+        
+        return contribution
+            
+            
+    
     def run_until_consensus(self, condition: str, 
                             rel_tol: float = 0.01, abs_tol: float = 0.001, max_iter: int = 100, use_std: bool = False,
                             n_jobs: int = 1, verbose: bool = False, verbose_level: int = 1, return_meta_df: bool = False):
@@ -353,14 +383,14 @@ class Powerkit:
             if verbose and verbose_level >= 2:
                 verbose_at_run = True
             df = self.run_selected_condition(condition, rng_list=rng_list_to_run, n_jobs=n_jobs, verbose=verbose_at_run)
-            if verbose and verbose_level >= 3:
-                print(f'finished running condition {condition} with rng {rng}')
+            # if verbose and verbose_level >= 3:
+            #     print(f'finished running condition {condition} with rng {rng}')
             if df is None:
                 raise ValueError(f'no df is returned for condition {condition}')
             else: 
                 total_df = pd.concat([total_df, df], axis=0)
-            if verbose and verbose_level >= 3:
-                print(f'finished concatenating df for condition {condition} with rng {rng}')
+            # if verbose and verbose_level >= 3:
+            #     print(f'finished concatenating df for condition {condition} with rng {rng}')
 
             if isinstance(prev_contrib, int):
                 if verbose and verbose_level >= 3:
@@ -1349,40 +1379,48 @@ def get_mean_contribution_general(scores, strict_mean=0.25, adjust_for_accuracy=
             col 3: count of feature_names
     '''
     
-    # if obj has attr shape, it is treated as a dataframe
     if hasattr(scores, 'shape'): 
-        df = scores.copy()
+        new_df = scores.copy()
     else: 
-        df = pd.DataFrame(scores, columns=['iteration_no', 'feature_names', 'scores'])
+        new_df = pd.DataFrame(scores, columns=['iteration_no', 'feature_names', 'scores'])
         
     # get the mean scores for each feature
-    mean_scores_df = df.groupby('feature_names').mean()
-    
+    mean_scores_df = new_df.groupby('feature_names').mean()
+
+    # mean_scores_df.head()
+
     if adjust_for_accuracy: 
         
         assert accuracy_scores is not None, 'accuracy_scores must be provided if adjust_for_accuracy is True'
         
+        # print(accuracy_scores)
+        
         # get the accuracy scores for each feature
         accuracy_scores_df = pd.DataFrame(accuracy_scores, columns=['feature_names', 'accuracy_scores'])
         
-        # join the accuracy scores to the mean scores
-        mean_scores_df = mean_scores_df.join(accuracy_scores_df.set_index('feature_names'), on='feature_names')
+        # get the mean accuracy scores for each feature
+        mean_accuracy_scores_df = accuracy_scores_df.groupby('feature_names').mean()
         
-        # divide the mean scores by the accuracy scores
-        mean_scores_df['scores'] = mean_scores_df['scores'] / mean_scores_df['accuracy_scores']
+        # # join the accuracy scores to the mean scores
+        mean_scores_df = mean_scores_df.join(mean_accuracy_scores_df, on='feature_names')
         
-        # drop the accuracy scores column
+        # # divide the mean scores by the accuracy scores
+        mean_scores_df['scores'] = mean_scores_df['scores'] * mean_scores_df['accuracy_scores']
+        
+        # # drop the accuracy scores column
         mean_scores_df.drop(columns=['accuracy_scores'], inplace=True)
-    
+
     # get the count of each feature
-    feature_count = df.groupby('feature_names').count()
-    
+    feature_count = new_df.groupby('feature_names').count()
+
     # join the count to the mean scores
     mean_scores_df['count'] = feature_count['scores']
-    
-    # filter out features that are not present in at least x% of iterations
-    mean_scores_df = mean_scores_df[mean_scores_df['count'] >= df.shape[0] * strict_mean]
-    
+
+    # mean_scores_df.head()
+
+    # # filter out features that are not present in at least x% of iterations
+    mean_scores_df = mean_scores_df[mean_scores_df['count'] >= new_df['iteration_no'].nunique() * strict_mean]
+
     # sort by mean scores
     mean_scores_df.sort_values(by='scores', ascending=False, inplace=True)
     
