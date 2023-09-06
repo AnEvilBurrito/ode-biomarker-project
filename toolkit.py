@@ -8,7 +8,7 @@ import pickle
 import logging, sys # for logging
 from typing import Callable
 
-from joblib import Parallel, delayed # for parallel processing
+from joblib import Parallel, delayed, cpu_count # for parallel processing
 
 # external imports
 import numpy as np
@@ -310,7 +310,17 @@ class Powerkit:
         df = self._abstract_run(rng_list, n_jobs, verbose, conditions=[condition])
         return df
     
-    def get_mean_contribution(self, df, col_name='feature_importance', adjust_for_accuracy=False, accuracy_col_name='model_performance', **kwargs):
+    def get_mean_contribution(self, df, condition, col_name='feature_importance', adjust_for_accuracy=False, accuracy_col_name='model_performance', **kwargs):
+        '''
+        Use adjust_for_accuracy ONLY when the distribution of the model performance is similar to that of the feature importance
+        '''
+        
+        # if condition does not exist, raise error
+        if condition not in self.conditions.keys():
+            raise ValueError(f'condition {condition} does not exist')
+        
+        # filter the dataframe by condition
+        df = df[df['condition'] == condition]
         
         feature_importance = df[col_name]
         rngs = df['rng']
@@ -395,16 +405,17 @@ class Powerkit:
             if isinstance(prev_contrib, int):
                 if verbose and verbose_level >= 3:
                     print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
-                prev_contrib = get_mean_contribution(total_df, condition, absolute_value=True, strict_mean=0)
+                prev_contrib = get_mean_contribution_general(total_df, condition, strict_mean=0)
                 # strict mean = 0, sum only at the end
             else:
-                current_contrib = get_mean_contribution(total_df, condition, absolute_value=True, strict_mean=0)
+                current_contrib = get_mean_contribution_general(total_df, condition, strict_mean=0)
                 # print the first five features in one line by converting to list
                 if verbose and verbose_level >= 1:
                     print(f'current_contrib: {list(current_contrib.index[:5])}')
                 if verbose and verbose_level >= 3:
                     # print(f'{prev_contrib}, {current_contrib}')
                     print(f'total abs prev: {get_abs_sum_for_feature_contributions(prev_contrib)}, total abs current: {get_abs_sum_for_feature_contributions(current_contrib)}')
+                    
                 diff = get_diff_between_feature_contributions(current_contrib, prev_contrib)
                 abs_diff = get_abs_sum_for_feature_contributions(diff)
                 abs_prev = get_abs_sum_for_feature_contributions(prev_contrib)
