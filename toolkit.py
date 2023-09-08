@@ -381,11 +381,15 @@ class Powerkit:
 
         meta_results = []
         total_df = pd.DataFrame()
+        early_break = False
 
         while current_tol > rel_tol and abs_diff > abs_tol and len(rng_list) < max_iter:
             
-            n_rngs = n_jobs if n_jobs != -1 else cpu_count()
-            rngs = self.generate_rng_list(n_rngs * crunch_factor)
+            if early_break: 
+                break
+            
+            n_rngs = (n_jobs if n_jobs != -1 else cpu_count()) * crunch_factor
+            rngs = self.generate_rng_list(n_rngs)
 
             if verbose and verbose_level >= 3:
                 print(f'running condition {condition} with rng {rngs}')
@@ -397,14 +401,14 @@ class Powerkit:
             # create a mini df for each iteration
             for rng in rngs: 
                 mini_df = df[df['rng'] == rng]
-                print(mini_df.shape)
+                # print(mini_df.shape)
             
                 if verbose and verbose_level >= 3:
                     print(f'finished running condition {condition} with rng {rng}')
                 if mini_df is None:
                     raise ValueError(f'no df is returned for condition {condition}')
-                else: 
-                    total_df = pd.concat([total_df, mini_df], axis=0)
+
+                total_df = pd.concat([total_df, mini_df], axis=0)
                 if verbose and verbose_level >= 3:
                     print(f'finished concatenating df for condition {condition} with rng {rng}')
 
@@ -413,6 +417,9 @@ class Powerkit:
                         print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
                     prev_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
                     # strict mean = 0, sum only at the end
+                    if verbose and verbose_level >= 1:
+                        print(f'prev_contrib: {list(prev_contrib.index[:5])}')
+                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, performance: {df["model_performance"].mean():2f}')
                 else:
                     current_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
                     # print the first five features in one line by converting to list
@@ -433,8 +440,9 @@ class Powerkit:
                     meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df['model_performance'].mean()])
                 
                 rng_list.append(rng)
-                if current_tol > rel_tol and abs_diff > abs_tol and len(rng_list) < max_iter:
-                    break 
+                if current_tol <= rel_tol or abs_diff <= abs_tol or len(rng_list) >= max_iter:
+                    early_break = True
+                    break
                     
             
         if verbose and verbose_level >= 0: 
