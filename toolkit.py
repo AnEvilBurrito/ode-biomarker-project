@@ -352,7 +352,8 @@ class Powerkit:
     
     def run_until_consensus(self, condition: str, 
                             rel_tol: float = 0.01, abs_tol: float = 0.001, max_iter: int = 100, use_std: bool = False,
-                            n_jobs: int = 1, verbose: bool = False, verbose_level: int = 1, return_meta_df: bool = False):
+                            n_jobs: int = 1, verbose: bool = False, verbose_level: int = 1, return_meta_df: bool = False,
+                            crunch_factor=1):
         
         '''
         Input: 
@@ -384,9 +385,7 @@ class Powerkit:
         while current_tol > rel_tol and abs_diff > abs_tol and len(rng_list) < max_iter:
             
             n_rngs = n_jobs if n_jobs != -1 else cpu_count()
-            rngs = self.generate_rng_list(n_rngs)
-            for n in rngs:
-                rng_list.append(n)
+            rngs = self.generate_rng_list(n_rngs * crunch_factor)
 
             if verbose and verbose_level >= 3:
                 print(f'running condition {condition} with rng {rngs}')
@@ -394,38 +393,49 @@ class Powerkit:
             if verbose and verbose_level >= 2:
                 verbose_at_run = True
             df = self.run_selected_condition(condition, rng_list=rngs, n_jobs=n_jobs, verbose=verbose_at_run)
-            if verbose and verbose_level >= 3:
-                print(f'finished running condition {condition} with rng {rngs}')
-            if df is None:
-                raise ValueError(f'no df is returned for condition {condition}')
-            else: 
-                total_df = pd.concat([total_df, df], axis=0)
-            if verbose and verbose_level >= 3:
-                print(f'finished concatenating df for condition {condition} with rng {rngs}')
+            
+            # create a mini df for each iteration
+            for rng in rngs: 
+                mini_df = df[df['rng'] == rng]
+                print(mini_df.shape)
+            
+                if verbose and verbose_level >= 3:
+                    print(f'finished running condition {condition} with rng {rng}')
+                if mini_df is None:
+                    raise ValueError(f'no df is returned for condition {condition}')
+                else: 
+                    total_df = pd.concat([total_df, mini_df], axis=0)
+                if verbose and verbose_level >= 3:
+                    print(f'finished concatenating df for condition {condition} with rng {rng}')
 
-            if isinstance(prev_contrib, int):
-                if verbose and verbose_level >= 3:
-                    print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
-                prev_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
-                # strict mean = 0, sum only at the end
-            else:
-                current_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
-                # print the first five features in one line by converting to list
-                if verbose and verbose_level >= 1:
-                    print(f'current_contrib: {list(current_contrib.index[:5])}')
+                if isinstance(prev_contrib, int):
+                    if verbose and verbose_level >= 3:
+                        print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
+                    prev_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
+                    # strict mean = 0, sum only at the end
+                else:
+                    current_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
+                    # print the first five features in one line by converting to list
+                    if verbose and verbose_level >= 1:
+                        print(f'current_contrib: {list(current_contrib.index[:5])}')
+                        
+                    diff = prev_contrib.copy()    
+                    diff['scores'] = prev_contrib['scores'] - current_contrib['scores']
+                    abs_diff = np.abs(diff['scores']).sum()
+                    abs_prev = np.abs(prev_contrib['scores']).sum()
+                    if verbose and verbose_level >= 3:
+                        # print(f'{prev_contrib}, {current_contrib}')
+                        print(f'total abs prev: {abs_prev}, total abs current: {abs_diff}')
+                    current_tol = 1 - (abs_prev - abs_diff) / abs_prev
+                    prev_contrib = current_contrib
+                    if verbose and verbose_level >= 1: 
+                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, performance: {df["model_performance"].mean():2f}')
+                    meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df['model_performance'].mean()])
+                
+                rng_list.append(rng)
+                if current_tol > rel_tol and abs_diff > abs_tol and len(rng_list) < max_iter:
+                    break 
                     
-                diff = prev_contrib.copy()    
-                diff['scores'] = prev_contrib['scores'] - current_contrib['scores']
-                abs_diff = np.abs(diff['scores']).sum()
-                abs_prev = np.abs(prev_contrib['scores']).sum()
-                if verbose and verbose_level >= 3:
-                    # print(f'{prev_contrib}, {current_contrib}')
-                    print(f'total abs prev: {abs_prev}, total abs current: {abs_diff}')
-                current_tol = 1 - (abs_prev - abs_diff) / abs_prev
-                prev_contrib = current_contrib
-                if verbose and verbose_level >= 1: 
-                    print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, performance: {df["model_performance"].mean():2f}')
-                meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df['model_performance'].mean()])
             
         if verbose and verbose_level >= 0: 
             # display in one line 
