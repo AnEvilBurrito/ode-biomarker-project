@@ -1457,6 +1457,56 @@ def get_mean_contribution_general(scores, strict_mean=0.25, adjust_for_accuracy=
     
     return mean_scores_df    
     
+def get_variation(df, condition, use_iqr=True, strict_mean=0.75):
+    
+    # NOTE: df must contain a column called 'feature_importance' with a tuple of (features, scores)
+    # a column called 'rng' with the rng values is also required
+    # ideally, n needs to be large enough to get a good estimate of the variability
+    
+    # first, condition is needed to filter the dataframe
+    df = df[df['condition'] == condition]
+    
+    list_of_dict = []
+    feature_importance_df = df['feature_importance']
+    for row in feature_importance_df:
+        for x,y in zip(row[0], row[1]):
+            # print(f'Feature: {x}, Score: {y}')
+            list_of_dict.append({'feature': x, 'variability_score': y})
+            
+    feature_importance_all = pd.DataFrame(list_of_dict)
+    feature_count = feature_importance_all.groupby('feature').count()
+    
+    if use_iqr: 
+        iqr_df = (feature_importance_all.groupby('feature').quantile(0.75) - feature_importance_all.groupby('feature').quantile(0.25))
+        iqr_df_div_mean = iqr_df / abs(feature_importance_all.groupby('feature').mean())
+        # add IQR and mean columns
+        iqr_df_div_mean['iqr'] = iqr_df
+        iqr_df_div_mean['mean'] = feature_importance_all.groupby('feature').mean()
+
+        iqr_df_div_mean['count'] = feature_count['variability_score']
+        iqr_df_div_mean = iqr_df_div_mean[iqr_df_div_mean['count'] >= df['rng'].nunique() * strict_mean]
+
+        # sort the dataframe by iqr, ascending
+        iqr_df_div_mean = iqr_df_div_mean.sort_values(by='variability_score', ascending=True)
+        
+
+        return iqr_df_div_mean
+    else:
+        # calculate the std for each feature divided by the mean
+        # NOTE: only use this if a normal distribution is assumed
+        std_df = feature_importance_all.groupby('feature').std() / abs(feature_importance_all.groupby('feature').mean())
+
+        # add std and mean columns
+        std_df['std'] = feature_importance_all.groupby('feature').std()
+        std_df['mean'] = feature_importance_all.groupby('feature').mean()
+        
+        std_df['count'] = feature_count['variability_score']
+        std_df = std_df[std_df['count'] >= df['rng'].nunique() * strict_mean]
+
+        # sort the dataframe by std, ascending
+
+        std_df = std_df.sort_values(by='variability_score', ascending=True)
+        return std_df
     
 def get_diff_between_feature_contributions(shap_df1: pd.DataFrame, shap_df2: pd.DataFrame):
     # compute the difference in mean shap values for each feature
