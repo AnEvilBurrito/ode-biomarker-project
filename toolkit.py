@@ -904,13 +904,11 @@ def hypertune_svr(X: pd.DataFrame, y: pd.Series, n_jobs=1):
     from sklearn.svm import SVR
 
     # define the parameter values that should be searched
-    C_range = np.logspace(-2, 10, 13)
-    gamma_range = np.logspace(-9, 3, 13)
-    epsilon_range = np.logspace(-2, 10, 13)
-    param_grid = dict(gamma=gamma_range, C=C_range, epsilon=epsilon_range)
+    kernal_range = ['linear', 'poly', 'rbf', 'sigmoid']
+    param_grid = dict(kernal_range)
 
     # instantiate and fit the grid
-    grid = GridSearchCV(SVR(kernel='rbf'), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
+    grid = GridSearchCV(SVR(), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
     grid.fit(X, y)
 
     # view the complete results
