@@ -351,8 +351,12 @@ class Powerkit:
             
     
     def run_until_consensus(self, condition: str, 
-                            rel_tol: float = 0.01, abs_tol: float = 0.001, max_iter: int = 100, use_std: bool = False,
-                            n_jobs: int = 1, verbose: bool = False, verbose_level: int = 1, return_meta_df: bool = False,
+                            rel_tol: float = 0.01, abs_tol: float = 0.001, max_iter: int = 100, 
+                            use_std: bool = False,
+                            feature_importance_col_name: str = 'feature_importance', 
+                            model_performance_col_name: str = 'model_performance',
+                            n_jobs: int = 1, verbose: bool = False, verbose_level: int = 1, 
+                            return_meta_df: bool = False,
                             crunch_factor=1):
         
         '''
@@ -415,13 +419,13 @@ class Powerkit:
                 if isinstance(prev_contrib, int):
                     if verbose and verbose_level >= 3:
                         print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
-                    prev_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
+                    prev_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0, col_name=feature_importance_col_name)
                     # strict mean = 0, sum only at the end
                     if verbose and verbose_level >= 1:
                         print(f'prev_contrib: {list(prev_contrib.index[:5])}')
-                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, performance: {df["model_performance"].mean():2f}')
+                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, performance: {df[model_performance_col_name].mean():2f}')
                 else:
-                    current_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0)
+                    current_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0, col_name=feature_importance_col_name)
                     # print the first five features in one line by converting to list
                     if verbose and verbose_level >= 1:
                         print(f'current_contrib: {list(current_contrib.index[:5])}')
@@ -436,8 +440,8 @@ class Powerkit:
                     current_tol = 1 - (abs_prev - abs_diff) / abs_prev
                     prev_contrib = current_contrib
                     if verbose and verbose_level >= 1: 
-                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, performance: {df["model_performance"].mean():2f}')
-                    meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df['model_performance'].mean()])
+                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, performance: {df[model_performance_col_name].mean():2f}')
+                    meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df[model_performance_col_name].mean()])
                 
                 rng_list.append(rng)
                 if current_tol <= rel_tol or abs_diff <= abs_tol or len(rng_list) >= max_iter:
@@ -461,7 +465,7 @@ class Powerkit:
         
         # create a dataframe for meta results
         
-        meta_df = pd.DataFrame(meta_results, columns=['iteration', 'current_tol', 'abs_diff', 'abs_prev', 'corr'])
+        meta_df = pd.DataFrame(meta_results, columns=['iteration', 'current_tol', 'abs_diff', 'abs_prev', 'perf'])
 
         if return_meta_df:
             return rng_list, total_df, meta_df
