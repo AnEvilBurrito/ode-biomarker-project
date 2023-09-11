@@ -25,6 +25,7 @@ path_loader = PathLoader('data_config.env', 'current_user.env')
 import pandas as pd
 import pickle
 
+print('Loading data from biomarker data repository..')
 # import GDSC2 drug response data using pickle
 
 with open(f'{path_loader.get_data_path()}data/drug-response/GDSC2/cache_gdsc2.pkl', 'rb') as f:
@@ -160,9 +161,9 @@ if __name__ == "__main__":
     file_save_path = f'{path_loader.get_data_path()}data/results/SYPipelineScriptTest/'
     
     # save results
-    total_df.to_pickle('total_df_test.pkl')
-    meta_df.to_pickle('meta_df_test.pkl')
+    total_df.to_pickle(f'{file_save_path}total_df_test.pkl')
+    meta_df.to_pickle(f'{file_save_path}meta_df_test.pkl')
     
     # save rngs
-    with open('rngs_list_test.pkl', 'wb') as f:
+    with open(f'{file_save_path}rngs_list_test.pkl', 'wb') as f:
         pickle.dump(rngs, f)
