@@ -155,6 +155,10 @@ if __name__ == "__main__":
                                                         verbose=True, verbose_level=1, 
                                                         return_meta_df=True, crunch_factor=1)
     
+    # file save path 
+    
+    file_save_path = f'{path_loader.get_data_path()}data/results/SYPipelineScriptTest/'
+    
     # save results
     total_df.to_pickle('total_df_test.pkl')
     meta_df.to_pickle('meta_df_test.pkl')
