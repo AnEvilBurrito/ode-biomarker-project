@@ -130,40 +130,36 @@ def eval_func(X_test, y_test, pipeline_components=None, **kwargs):
 if __name__ == "__main__": 
     
     # turn X and Y into dataframes
-    X, y = make_regression(n_samples=500, n_features=1000, n_informative=10, random_state=1, shuffle=False)
 
-    X = pd.DataFrame(X)
-    y = pd.Series(y)
+    target_variable = "LN_IC50"
 
-    # turn columns into strings
+    data_df = utils.create_joint_dataset_from_proteome_gdsc("Palbociclib", joined_sin_peptile_exclusion_matrix, gdsc2, drug_value=target_variable)
+    feature_data, label_data = utils.create_feature_and_label(data_df, label_name=target_variable)
+    
+    condition = 'SY_test'
+    powerkit = Powerkit(feature_data, label_data) 
+    powerkit.add_condition(condition, True, pipeline_func, {}, eval_func, {})
 
-    X.columns = [str(i) for i in range(X.shape[1])]
+    print('Running powerkit..')
 
-    print(f'Original informative columns: {X.columns[:10]}')
-
-    # shuffle columns around for X
-
-    X = X.sample(frac=1, axis=1, random_state=0)
-
-    print(f'Newly shuffled columns (non-informative): {X.columns[:10]}')
-
-    powerkit = Powerkit(X, y) 
-    powerkit.add_condition('test', True, pipeline_func, {}, eval_func, {})
-
-
-    rngs, total_df, meta_df = powerkit.run_until_consensus('test', n_jobs=4, abs_tol=0.001, 
+    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, n_jobs=4, abs_tol=0.001, 
                                                         rel_tol=0.0001, max_iter=100,
                                                         verbose=True, verbose_level=1, 
                                                         return_meta_df=True, crunch_factor=1)
     
     # file save path 
     
-    file_save_path = f'{path_loader.get_data_path()}data/results/SYPipelineScriptTest/'
+    folder_name = 'SYPipelineScript'
+    
+    if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'):
+        os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')
+    
+    file_save_path = f'{path_loader.get_data_path()}data/results/{folder_name}/'
     
     # save results
-    total_df.to_pickle(f'{file_save_path}total_df_test.pkl')
-    meta_df.to_pickle(f'{file_save_path}meta_df_test.pkl')
+    total_df.to_pickle(f'{file_save_path}total_df_{condition}.pkl')
+    meta_df.to_pickle(f'{file_save_path}meta_df_{condition}.pkl')
     
     # save rngs
-    with open(f'{file_save_path}rngs_list_test.pkl', 'wb') as f:
+    with open(f'{file_save_path}rngs_list_{condition}.pkl', 'wb') as f:
         pickle.dump(rngs, f)
