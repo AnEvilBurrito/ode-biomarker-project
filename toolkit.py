@@ -53,6 +53,9 @@ from sklearn.base import clone
 import sklearn_relief as sr
 
 
+# hyperparameter tuning
+from sklearn.model_selection import GridSearchCV
+
 ## validation
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
@@ -440,8 +443,8 @@ class Powerkit:
                     current_tol = 1 - (abs_prev - abs_diff) / abs_prev
                     prev_contrib = current_contrib
                     if verbose and verbose_level >= 1: 
-                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, performance: {df[model_performance_col_name].mean():2f}')
-                    meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, df[model_performance_col_name].mean()])
+                        print(f'current iteration: {len(rng_list)} current_tol: {current_tol:4f}, abs_diff: {abs_diff:6f}, abs_prev: {abs_prev:2f}, performance: {total_df[model_performance_col_name].mean():2f}')
+                    meta_results.append([len(rng_list), current_tol, abs_diff, abs_prev, total_df[model_performance_col_name].mean()])
                 
                 rng_list.append(rng)
                 if current_tol <= rel_tol or abs_diff <= abs_tol or len(rng_list) >= max_iter:
@@ -891,24 +894,20 @@ All feature selection methods should return the following:
     params: dict, the best parameters for the model
 '''
 
-def hypertune_svr(X: pd.DataFrame, y: pd.Series, n_jobs=1):
+def hypertune_svr(X: pd.DataFrame, y: pd.Series, cv=5, n_jobs=1):
     '''
-    WARNING TODO: GPT generated code, not tested
     Input:
         X: pandas dataframe, the training data
         y: pandas series, the training label
     Output:
         best_params: dict, the best parameters for the model
     '''
-    from sklearn.model_selection import GridSearchCV
-    from sklearn.svm import SVR
 
     # define the parameter values that should be searched
-    kernal_range = ['linear', 'poly', 'rbf', 'sigmoid']
-    param_grid = dict(kernal_range)
+    kernel_range = {'kernel': ['linear', 'poly', 'rbf', 'sigmoid']}
 
     # instantiate and fit the grid
-    grid = GridSearchCV(SVR(), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
+    grid = GridSearchCV(SVR(), kernel_range, cv=cv, scoring='r2', n_jobs=n_jobs)
     grid.fit(X, y)
 
     # view the complete results
@@ -918,30 +917,27 @@ def hypertune_svr(X: pd.DataFrame, y: pd.Series, n_jobs=1):
     # print(grid.best_score_)
     # print(grid.best_params_)
 
-    return grid.best_params_
+    return grid.best_params_, grid.best_score_, grid.cv_results_
 
-def hypertune_ann(X: pd.DataFrame, y: pd.Series, n_jobs=1):
+def hypertune_ann(X: pd.DataFrame, y: pd.Series, cv=5, n_jobs=1):
     '''
-    WARNING TODO: GPT generated code, not tested
     Input:
         X: pandas dataframe, the training data
         y: pandas series, the training label
     Output:
         best_params: dict, the best parameters for the model
     '''
-    from sklearn.model_selection import GridSearchCV
-    from sklearn.neural_network import MLPRegressor
 
     # define the parameter values that should be searched
-    hidden_layer_sizes_range = [(i,) for i in range(1, 100)]
-    activation_range = ['identity', 'logistic', 'tanh', 'relu']
-    solver_range = ['lbfgs', 'sgd', 'adam']
-    alpha_range = np.logspace(-5, 3, 9)
+    hidden_layer_sizes_range = [(i,) for i in range(1, 100, 10)]
+    hidden_layer_sizes_range += [(i, i) for i in range(1, 100, 10)]
+    hidden_layer_sizes_range += [(i, i, i) for i in range(1, 100, 10)]
     learning_rate_range = ['constant', 'invscaling', 'adaptive']
-    param_grid = dict(hidden_layer_sizes=hidden_layer_sizes_range, activation=activation_range, solver=solver_range, alpha=alpha_range, learning_rate=learning_rate_range)
+    param_grid = dict(hidden_layer_sizes=hidden_layer_sizes_range,
+                      learning_rate=learning_rate_range)
 
     # instantiate and fit the grid
-    grid = GridSearchCV(MLPRegressor(), param_grid, cv=5, scoring='neg_mean_squared_error', n_jobs=n_jobs)
+    grid = GridSearchCV(MLPRegressor(max_iter=10000), param_grid, cv=cv, scoring='r2', n_jobs=n_jobs)
     grid.fit(X, y)
 
     # view the complete results
@@ -951,7 +947,7 @@ def hypertune_ann(X: pd.DataFrame, y: pd.Series, n_jobs=1):
     # print(grid.best_score_)
     # print(grid.best_params_)
 
-    return grid.best_params_
+    return grid.best_params_, grid.best_score_, grid.cv_results_
 
 
 ### Feature Selection Methods 
@@ -1058,11 +1054,38 @@ def wrapper_rfs_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
     '''
     pass 
 
-def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int, model: BaseEstimator, **kwargs):
+def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int, 
+                              model: BaseEstimator, start_feature: str, cv: int, 
+                              scoring_method: str='r2', verbose=0):
     '''
     
     '''
-    pass
+    
+    selected = []
+    scores = []
+    
+    selected.append(start_feature)
+    score = cross_val_score(model, X[selected], y, cv=cv, scoring='r2').mean()
+    
+    remaining_features = X.columns.to_list()
+    remaining_features.remove(start_feature)
+    
+    while len(selected) < k:
+        max_score = -10000
+        for f in remaining_features: 
+            selected.append(f)
+            score = cross_val_score(model, X[selected], y, cv=cv, scoring='r2').mean()
+            if score > max_score:
+                max_score = score
+                max_feature = f
+            selected.pop()
+        selected.append(max_feature)
+        scores.append(max_score)
+        remaining_features.remove(max_feature)
+        if verbose == 1:
+            print(f'Feature Selected: {max_feature}, Score: {max_score}, Feature Size: {len(selected)}')
+    
+    return selected, scores
 
 
 ### Selection functions
