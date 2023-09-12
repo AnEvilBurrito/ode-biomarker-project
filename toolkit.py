@@ -1202,6 +1202,28 @@ def transform_impute_by_first_quantile(X, y):
     X = imputer.transform(X, return_df=True)
     return X, y
 
+def transform_impute_by_zero_to_min_uniform(X, y=None, assumed_absolute_min=0, verbose=0):
+    X_imputed = X.copy()
+    min_values = X_imputed.min(axis=0)
+    # sample from uniform distribution between 0 and minimum value of each column
+    # for each column, replace nan with the sampled value
+    for col in X_imputed.columns:
+
+        min_ = min_values[col]
+        
+        # print(f'min for {col}: {min_}')
+
+        if np.isnan(min_):
+            min_ = min_values.dropna().min() # if minimum value is nan, use the minimum value of the non-nan values
+
+        vals = np.random.uniform(assumed_absolute_min, min_, size=X_imputed[col].isna().sum())
+        # print the number of nan values in each column
+        if len(vals) > 0 and verbose > 0:
+            print(f'min for {col}: {min_}. Number of nan values in {col}: {X_imputed[col].isna().sum()}, number of values sampled: {len(vals)}, {vals}')
+        X_imputed.loc[X_imputed[col].isna(), col] = vals
+    
+    return X_imputed, y
+
 ### Selection functions with imputation built-in 
 '''
 These functions are also selection functions, but they are not recommended
