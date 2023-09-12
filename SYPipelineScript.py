@@ -76,7 +76,7 @@ with open(f'{path_loader.get_data_path()}data/protein-interaction/STRING/palboci
     
 def pipeline_func(X_train, y_train, **kwargs):
     
-    X_transformed, y_transformed = transform_impute_by_zero(X_train, y_train)
+    X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)
     # preliminary feature selection
     selected_features, scores = f_regression_select(X_transformed, y_transformed, k=100)
     # selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=10, return_index=False)
@@ -110,7 +110,7 @@ def eval_func(X_test, y_test, pipeline_components=None, **kwargs):
         y_test: test set labels
         pipeline_components: dictionary of pipeline components, e.g. {'model': model, 'selected_features': selected_features, 'scores': scores}
     '''
-    X_test, y_test = transform_impute_by_zero(X_test, y_test)
+    X_test, y_test = transform_impute_by_zero_to_min_uniform(X_test, y_test)
     _, X_selected = select_preset_features(X_test, y_test, pipeline_components['selected_features'])
     y_pred = pipeline_components['model'].predict(X_selected)
     # assess performance by pearson correlation
