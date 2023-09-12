@@ -89,7 +89,7 @@ def pipeline_func(X_train, y_train, **kwargs):
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
-    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, 10, tuned_model, start_feature=hi_feature,cv=5)
+    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, 10, tuned_model, start_feature=hi_feature,cv=5, verbose=1)
     
     _, X_wrapper_selected = select_preset_features(X_selected, y_transformed, wrapper_features)
     tuned_model.fit(X_wrapper_selected, y_transformed)
@@ -121,8 +121,7 @@ def eval_func(X_test, y_test, pipeline_components=None, **kwargs):
             'hp_results': pipeline_components['hp_results'],
             'best_params': pipeline_components['best_params'],
             'best_fit_score_hyperp': pipeline_components['best_fit_score_hyperp'],
-            'prelim_selected_features': pipeline_components['prelim_selected_features'],
-            'prelim_scores': pipeline_components['prelim_scores']
+            'prelim_feature_importance': (pipeline_components['prelim_selected_features'], pipeline_components['prelim_scores'])
             }
 
 
@@ -151,7 +150,7 @@ if __name__ == "__main__":
     powerkit.add_condition('test', True, pipeline_func, {}, eval_func, {})
 
 
-    rngs, total_df, meta_df = powerkit.run_until_consensus('test', n_jobs=4, abs_tol=0.001, 
+    rngs, total_df, meta_df = powerkit.run_until_consensus('test', n_jobs=1, abs_tol=0.001, 
                                                         rel_tol=0.0001, max_iter=100,
                                                         verbose=True, verbose_level=1, 
                                                         return_meta_df=True, crunch_factor=1)
@@ -161,6 +160,7 @@ if __name__ == "__main__":
     file_save_path = f'{path_loader.get_data_path()}data/results/SYPipelineScriptTest/'
     
     # save results
+    
     total_df.to_pickle(f'{file_save_path}total_df_test.pkl')
     meta_df.to_pickle(f'{file_save_path}meta_df_test.pkl')
     

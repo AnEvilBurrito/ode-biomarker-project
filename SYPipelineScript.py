@@ -82,18 +82,19 @@ def pipeline_func(X_train, y_train, **kwargs):
     # selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=10, return_index=False)
     selected_features, X_selected = select_preset_features(X_transformed, y_transformed, selected_features)
     # tuning hyperparameters
-    model = SVR()
     best_params, best_fit_score_hyperp, hp_results = hypertune_svr(X_selected, y_transformed, cv=5)
     tuned_model = SVR(**best_params)
     
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
-    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, 10, tuned_model, start_feature=hi_feature,cv=5)
+    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, 10, tuned_model, start_feature=hi_feature,cv=5, verbose=1)
     
     _, X_wrapper_selected = select_preset_features(X_selected, y_transformed, wrapper_features)
     tuned_model.fit(X_wrapper_selected, y_transformed)
-    return {'model': tuned_model, 'selected_features': wrapper_features, 'scores': wrapper_scores,
+    return {'model': tuned_model, 
+            'selected_features': wrapper_features, 
+            'scores': wrapper_scores,
             'hp_results': hp_results, 
             'best_params': best_params, 
             'best_fit_score_hyperp': best_fit_score_hyperp,
@@ -142,7 +143,7 @@ if __name__ == "__main__":
 
     print('Running powerkit..')
 
-    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, n_jobs=4, abs_tol=0.001, 
+    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, n_jobs=1, abs_tol=0.001, 
                                                         rel_tol=0.0001, max_iter=100,
                                                         verbose=True, verbose_level=1, 
                                                         return_meta_df=True, crunch_factor=1)

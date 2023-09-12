@@ -318,10 +318,6 @@ class Powerkit:
         Use adjust_for_accuracy ONLY when the distribution of the model performance is similar to that of the feature importance
         '''
         
-        # if condition does not exist, raise error
-        if condition not in self.conditions.keys():
-            raise ValueError(f'condition {condition} does not exist')
-        
         # filter the dataframe by condition
         df = df[df['condition'] == condition]
         
