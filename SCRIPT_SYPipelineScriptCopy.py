@@ -152,10 +152,7 @@ if __name__ == "__main__":
                       'return_meta_df': True,
                       'crunch_factor': 1}
 
-    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, n_jobs=1, abs_tol=0.001, 
-                                                        rel_tol=0.0001, max_iter=100,
-                                                        verbose=True, verbose_level=1, 
-                                                        return_meta_df=True, crunch_factor=1)
+    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, params_profile)
     
     # file save path 
     
