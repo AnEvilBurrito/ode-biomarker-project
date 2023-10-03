@@ -9,6 +9,9 @@ from copy import deepcopy
 from sklearn.svm import SVR
 from sklearn.feature_selection import f_regression
 
+# import variance threshold
+from sklearn.feature_selection import VarianceThreshold
+
 from sklearn.datasets import make_regression
 import pandas as pd
 import numpy as np
@@ -78,30 +81,43 @@ def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper
                   **kwargs):
     
     X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)
+    
+    # debug feature selection
+    # print(X_transformed.shape, y_transformed.shape)
+    
+    
+    # removing features with zero variance to avoid division by zero in f_regression
+    threshold_selector = VarianceThreshold(threshold=0.0)
+    threshold_selector.fit(X_transformed)
+    threshold_columns = X_transformed.columns[threshold_selector.get_support()]
+    X_transformed = X_transformed[threshold_columns]
+    
+    # print(X_transformed.shape, y_transformed.shape, "after variance threshold")
+    
     # preliminary feature selection
-    print('Here! @after transform_impute_by_zero_to_min_uniform')
+    # print('Here! @after transform_impute_by_zero_to_min_uniform')
     if use_mrmr:
         selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=pre_select_size, return_index=False)
     else:
         selected_features, scores = f_regression_select(X_transformed, y_transformed, k=pre_select_size)
         
-    print('Here! @after feature selection')
+    # print('Here! @after feature selection')
     
     selected_features, X_selected = select_preset_features(X_transformed, y_transformed, selected_features)
     # tuning hyperparameters
     best_params, best_fit_score_hyperp, hp_results = hypertune_svr(X_selected, y_transformed, cv=5)
     tuned_model = SVR(**best_params)
     
-    print('Here! @after hyperparameter tuning')
+    # print('Here! @after hyperparameter tuning')
     
     
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
     wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, wrapper_select_size, tuned_model, 
-                                                                 start_feature=hi_feature,cv=5, verbose=1)
+                                                                 start_feature=hi_feature,cv=5, verbose=0)
     
-    print('Here! @after wrapper feature selection')
+    # print('Here! @after wrapper feature selection')
     
     
     _, X_wrapper_selected = select_preset_features(X_selected, y_transformed, wrapper_features)
