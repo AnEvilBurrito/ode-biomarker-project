@@ -202,4 +202,4 @@ if __name__ == "__main__":
         rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)  
         # --- actual saving of results for specific conditions 
         
-        quick_save_powerkit_results(total_df, meta_df, condition, file_save_path)
+        quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
