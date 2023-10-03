@@ -92,7 +92,7 @@ def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
-    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, wrapper_select_size, tuned_model, start_feature=hi_feature,cv=5, verbose=1)
+    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, wrapper_select_size, tuned_model, start_feature=hi_feature,cv=5, verbose=0)
     
     _, X_wrapper_selected = select_preset_features(X_selected, y_transformed, wrapper_features)
     tuned_model.fit(X_wrapper_selected, y_transformed)
@@ -161,10 +161,10 @@ if __name__ == "__main__":
     condition2 = 'SY_testMRMR' 
     powerkit.add_condition(condition2, True, pipeline_func, {'use_mrmr': True}, eval_func, {})
     
-    params_profile = {'n_jobs': 1, 
+    params_profile = {'n_jobs': 4, 
                       'abs_tol': 0.001, 
                       'rel_tol': 0.0001, 
-                      'max_iter': 10, 
+                      'max_iter': 50, 
                       'verbose': True,
                       'verbose_level': 1,
                       'return_meta_df': True,
