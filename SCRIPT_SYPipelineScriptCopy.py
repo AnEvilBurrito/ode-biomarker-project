@@ -146,20 +146,17 @@ if __name__ == "__main__":
     params_profile = {'n_jobs': 1, 
                       'abs_tol': 0.001, 
                       'rel_tol': 0.0001, 
-                      'max_iter': 100, 
+                      'max_iter': 10, 
                       'verbose': True,
                       'verbose_level': 1,
                       'return_meta_df': True,
                       'crunch_factor': 1}
 
-    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, n_jobs=1, abs_tol=0.001, 
-                                                        rel_tol=0.0001, max_iter=100,
-                                                        verbose=True, verbose_level=1, 
-                                                        return_meta_df=True, crunch_factor=1)
+    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)
     
     # file save path 
     
-    folder_name = 'SYPipelineScript'
+    folder_name = 'SYPipelineScriptCopy'
     
     if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'):
         os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')

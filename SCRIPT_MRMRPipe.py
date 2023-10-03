@@ -78,8 +78,8 @@ def pipeline_func(X_train, y_train, **kwargs):
     
     X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)
     # preliminary feature selection
-    selected_features, scores = f_regression_select(X_transformed, y_transformed, k=100)
-    # selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=10, return_index=False)
+    # selected_features, scores = f_regression_select(X_transformed, y_transformed, k=100)
+    selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=10, return_index=False)
     selected_features, X_selected = select_preset_features(X_transformed, y_transformed, selected_features)
     # tuning hyperparameters
     best_params, best_fit_score_hyperp, hp_results = hypertune_svr(X_selected, y_transformed, cv=5)
@@ -88,7 +88,7 @@ def pipeline_func(X_train, y_train, **kwargs):
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
-    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, 10, tuned_model, start_feature=hi_feature,cv=5, verbose=1)
+    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, 10, tuned_model, start_feature=hi_feature,cv=5, verbose=0)
     
     _, X_wrapper_selected = select_preset_features(X_selected, y_transformed, wrapper_features)
     tuned_model.fit(X_wrapper_selected, y_transformed)
@@ -146,20 +146,17 @@ if __name__ == "__main__":
     params_profile = {'n_jobs': 1, 
                       'abs_tol': 0.001, 
                       'rel_tol': 0.0001, 
-                      'max_iter': 100, 
+                      'max_iter': 250, 
                       'verbose': True,
                       'verbose_level': 1,
                       'return_meta_df': True,
                       'crunch_factor': 1}
 
-    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, n_jobs=1, abs_tol=0.001, 
-                                                        rel_tol=0.0001, max_iter=100,
-                                                        verbose=True, verbose_level=1, 
-                                                        return_meta_df=True, crunch_factor=1)
+    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)
     
     # file save path 
     
-    folder_name = 'SYPipelineScript'
+    folder_name = 'MRMRPipe'
     
     if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'):
         os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')
