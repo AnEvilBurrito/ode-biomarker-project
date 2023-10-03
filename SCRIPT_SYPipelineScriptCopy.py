@@ -79,20 +79,29 @@ def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper
     
     X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)
     # preliminary feature selection
-    
+    print('Here! @after transform_impute_by_zero_to_min_uniform')
     if use_mrmr:
         selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=pre_select_size, return_index=False)
     else:
         selected_features, scores = f_regression_select(X_transformed, y_transformed, k=pre_select_size)
+        
+    print('Here! @after feature selection')
+    
     selected_features, X_selected = select_preset_features(X_transformed, y_transformed, selected_features)
     # tuning hyperparameters
     best_params, best_fit_score_hyperp, hp_results = hypertune_svr(X_selected, y_transformed, cv=5)
     tuned_model = SVR(**best_params)
     
+    print('Here! @after hyperparameter tuning')
+    
+    
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
     wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, wrapper_select_size, tuned_model, start_feature=hi_feature,cv=5, verbose=0)
+    
+    print('Here! @after wrapper feature selection')
+    
     
     _, X_wrapper_selected = select_preset_features(X_selected, y_transformed, wrapper_features)
     tuned_model.fit(X_wrapper_selected, y_transformed)
@@ -161,7 +170,7 @@ if __name__ == "__main__":
     condition2 = 'SY_testMRMR' 
     powerkit.add_condition(condition2, True, pipeline_func, {'use_mrmr': True}, eval_func, {})
     
-    params_profile = {'n_jobs': 4, 
+    params_profile = {'n_jobs': 1, 
                       'abs_tol': 0.001, 
                       'rel_tol': 0.0001, 
                       'max_iter': 50, 
