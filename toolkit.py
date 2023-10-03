@@ -1560,3 +1560,13 @@ def get_diff_between_feature_contributions(shap_df1: pd.DataFrame, shap_df2: pd.
 def get_abs_sum_for_feature_contributions(df: pd.DataFrame):
     return np.abs(df['mean_shap_values']).sum()
 
+### --- Utils function 
+
+def quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path):
+    # save results
+    total_df.to_pickle(f'{file_save_path}total_df_{condition}.pkl')
+    meta_df.to_pickle(f'{file_save_path}meta_df_{condition}.pkl')
+    
+    # save rngs
+    with open(f'{file_save_path}rngs_list_{condition}.pkl', 'wb') as f:
+        pickle.dump(rngs, f)

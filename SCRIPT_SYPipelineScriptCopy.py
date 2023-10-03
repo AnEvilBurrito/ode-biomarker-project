@@ -74,12 +74,16 @@ with open(f'{path_loader.get_data_path()}data/protein-interaction/STRING/palboci
     nth_degree_neighbours = pickle.load(f)
 
     
-def pipeline_func(X_train, y_train, **kwargs):
+def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper_select_size=10,
+                  **kwargs):
     
     X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)
     # preliminary feature selection
-    selected_features, scores = f_regression_select(X_transformed, y_transformed, k=100)
-    # selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=10, return_index=False)
+    
+    if use_mrmr:
+        selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=pre_select_size, return_index=False)
+    else:
+        selected_features, scores = f_regression_select(X_transformed, y_transformed, k=pre_select_size)
     selected_features, X_selected = select_preset_features(X_transformed, y_transformed, selected_features)
     # tuning hyperparameters
     best_params, best_fit_score_hyperp, hp_results = hypertune_svr(X_selected, y_transformed, cv=5)
@@ -88,7 +92,7 @@ def pipeline_func(X_train, y_train, **kwargs):
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
-    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, 10, tuned_model, start_feature=hi_feature,cv=5, verbose=1)
+    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, wrapper_select_size, tuned_model, start_feature=hi_feature,cv=5, verbose=1)
     
     _, X_wrapper_selected = select_preset_features(X_selected, y_transformed, wrapper_features)
     tuned_model.fit(X_wrapper_selected, y_transformed)
@@ -130,18 +134,32 @@ def eval_func(X_test, y_test, pipeline_components=None, **kwargs):
 
 if __name__ == "__main__": 
     
-    # turn X and Y into dataframes
+    ### --- Data Loading Section
 
     target_variable = "LN_IC50"
 
     data_df = utils.create_joint_dataset_from_proteome_gdsc("Palbociclib", joined_sin_peptile_exclusion_matrix, gdsc2, drug_value=target_variable)
     feature_data, label_data = utils.create_feature_and_label(data_df, label_name=target_variable)
     
-    condition = 'SY_test'
+    
+    ### --- Result Saving Configuration 
+    
+    # --- creating folder name and path
+    folder_name = 'SYPipelineScriptCopy' # always take the file name of the script after '_'
+    
+    if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'):
+        os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')
+    
+    file_save_path = f'{path_loader.get_data_path()}data/results/{folder_name}/'
+    
+    ### --- Powerkit running configurations
     powerkit = Powerkit(feature_data, label_data) 
+    
+    condition = 'SY_test' # running condition name, can be multiple conditions here
     powerkit.add_condition(condition, True, pipeline_func, {}, eval_func, {})
-
-    print('Running powerkit..')
+    
+    condition2 = 'SY_testMRMR' 
+    powerkit.add_condition(condition2, True, pipeline_func, {'use_mrmr': True}, eval_func, {})
     
     params_profile = {'n_jobs': 1, 
                       'abs_tol': 0.001, 
@@ -152,21 +170,10 @@ if __name__ == "__main__":
                       'return_meta_df': True,
                       'crunch_factor': 1}
 
-    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)
+    for condition in [condition, condition2]:
     
-    # file save path 
-    
-    folder_name = 'SYPipelineScriptCopy'
-    
-    if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'):
-        os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')
-    
-    file_save_path = f'{path_loader.get_data_path()}data/results/{folder_name}/'
-    
-    # save results
-    total_df.to_pickle(f'{file_save_path}total_df_{condition}.pkl')
-    meta_df.to_pickle(f'{file_save_path}meta_df_{condition}.pkl')
-    
-    # save rngs
-    with open(f'{file_save_path}rngs_list_{condition}.pkl', 'wb') as f:
-        pickle.dump(rngs, f)
+        print(f'Running powerkit for condition {condition}..')
+        rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)  
+        # --- actual saving of results for specific conditions 
+        
+        quick_save_powerkit_results(total_df, meta_df, condition, file_save_path)
