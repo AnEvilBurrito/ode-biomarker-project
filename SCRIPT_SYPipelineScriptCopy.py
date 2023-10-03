@@ -98,7 +98,8 @@ def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper
     # given selected_features and scores, select the highest scoring features
     hi_feature = selected_features[np.argmax(scores)]
     # use wrapper method to select features
-    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, wrapper_select_size, tuned_model, start_feature=hi_feature,cv=5, verbose=0)
+    wrapper_features, wrapper_scores = greedy_feedforward_select(X_selected, y_transformed, wrapper_select_size, tuned_model, 
+                                                                 start_feature=hi_feature,cv=5, verbose=1)
     
     print('Here! @after wrapper feature selection')
     

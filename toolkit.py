@@ -901,7 +901,6 @@ def hypertune_svr(X: pd.DataFrame, y: pd.Series, cv=5, n_jobs=1):
 
     # define the parameter values that should be searched
     kernel_range = {'kernel': ['linear', 'poly', 'rbf', 'sigmoid']}
-
     # instantiate and fit the grid
     grid = GridSearchCV(SVR(), kernel_range, cv=cv, scoring='r2', n_jobs=n_jobs)
     grid.fit(X, y)
