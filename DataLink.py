@@ -44,7 +44,16 @@ class DataLink:
             
     
     def get_data_using_code(loading_code: str):
+        '''
+        specialised processing method for convenient processing of raw data into typical feature & label data as 
+        pandas dataframes. 
         
+        Loading codes: 
+            'ccle-gdsc-{number}-{drug_name}-{target_label}': combining CCLE and GDSC data to create a single dataset for a given drug
+            'goncalves-gdsc-{number}-{drug_name}-{target_label}': combining goncalves and GDSC data to create a single dataset for a given drug
+            'sy-cancercell2022': SY's processed data from Cancer Cell 2022            
+        
+        '''
         
         if 'ccle-gdsc' in loading_code: 
             # automated combination of CCLE and GDSC1/2 data can be loaded 
