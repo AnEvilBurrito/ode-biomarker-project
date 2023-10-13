@@ -8,7 +8,7 @@ class DataLink:
     def __init__(self, path_loader: PathLoader, data_code_database_path) -> None:
         
         self.pathsHandle = path_loader 
-        self.data_code_database_path = data_code_database_path
+        self.data_code_database_path = pd.read_csv(data_code_database_path)
         
         
         print('Loading data from biomarker data repository..')
@@ -51,7 +51,7 @@ class DataLink:
 
         self.joined_full_protein_matrix = joined_full_protein_matrix
         self.joined_sin_peptile_exclusion_matrix = joined_sin_peptile_exclusion_matrix
-    
+        
     
     def load_data_code(self, data_code):
         
