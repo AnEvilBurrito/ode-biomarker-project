@@ -9,57 +9,39 @@ class DataLink:
         
         self.pathsHandle = path_loader 
         self.data_code_database_path = pd.read_csv(data_code_database_path)
-        
-        
-        print('Loading data from biomarker data repository..')
-        
-        # import GDSC1 drug response data using pickle
-        with open(f'{path_loader.get_data_path()}data/drug-response/GDSC1/cache_gdsc1.pkl', 'rb') as f:
-            gdsc1 = pickle.load(f)
-            gdsc1_info = pickle.load(f)
-        
-        self.gdsc1 = gdsc1
-        self.gdsc1_info = gdsc1_info
-        
-        # import GDSC2 drug response data using pickle
-        with open(f'{path_loader.get_data_path()}data/drug-response/GDSC2/cache_gdsc2.pkl', 'rb') as f:
-            gdsc2 = pickle.load(f)
-            gdsc2_info = pickle.load(f)
-            
-        self.gdsc2 = gdsc2
-        self.gdsc2_info = gdsc2_info
-            
-        # import CCLE gene expression data using pickle
+        self.data_code_database = {}
 
-        with open(f'{path_loader.get_data_path()}data/gene-expression/CCLE_Public_22Q2/ccle_expression.pkl', 'rb') as f:
-            gene_entrez = pickle.load(f)
-            ccle = pickle.load(f)
-
-        # import CCLE sample info data using pickle
-
-        with open(f'{path_loader.get_data_path()}data/gene-expression/CCLE_Public_22Q2/ccle_sample_info.pkl', 'rb') as f:
-            ccle_sample_info = pickle.load(f)
-            
-        self.gene_entrez = gene_entrez
-        self.ccle = ccle
-        self.ccle_sample_info = ccle_sample_info
-
-        # import proteomic expression
-        with open(f'{path_loader.get_data_path()}data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_fillna_processed.pkl', 'rb') as f:
-            joined_full_protein_matrix = pickle.load(f)
-            joined_sin_peptile_exclusion_matrix = pickle.load(f)
-
-        self.joined_full_protein_matrix = joined_full_protein_matrix
-        self.joined_sin_peptile_exclusion_matrix = joined_sin_peptile_exclusion_matrix
+    def load_all(self, verbose=True):
         
+        for data_code in self.data_code_database_path['data_code']:
+            self.load_data_code(data_code, verbose=verbose)
     
-    def load_data_code(self, data_code):
+    def load_data_code(self, data_code, verbose=False):
         
-        pass 
-    
-    def load_data_code_raw(self, data_code, index_position, file_path):
+        if data_code in self.data_code_database_path['data_code'].values:
+            index_pos = self.data_code_database_path[self.data_code_database_path['data_code'] == data_code]['index_position'].values[0]
+            file_path = self.data_code_database_path[self.data_code_database_path['data_code'] == data_code]['file_path'].values[0]
+            self.load_data_code_raw(data_code, index_pos, file_path, verbose=verbose)
         
-        pass
+        else: 
+            raise Exception(f'Data code {data_code} not found in database.')
+            
+    def load_data_code_raw(self, data_code, index_position, file_path, verbose=False):
+        
+        found = False
+        with open(f'{self.pathsHandle.get_data_path()}{file_path}', 'rb') as f:
+            for i in range(index_position+1):
+                data = pickle.load(f)
+                if i == index_position:
+                    self.data_code_database[data_code] = data
+                    found = True
+                    if verbose:
+                        print(f'Data code {data_code} loaded at {file_path} with index position {index_position}.')
+                    break
+                
+        if not found:
+            raise Exception(f'Data code {data_code} not found at {file_path} with index position {index_position}.')
+            
     
     def get_data_using_code(loading_code: str):
         
@@ -72,5 +54,3 @@ class DataLink:
         if 'goncalve-gdsc' in loading_code: 
             # automated combination of goncalves and GDSC1/2 data can be loaded 
             pass 
-        
-        

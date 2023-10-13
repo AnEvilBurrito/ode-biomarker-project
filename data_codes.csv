@@ -1,3 +1,10 @@
 data_code,index_position,file_path
 gdsc1,0,data/drug-response/GDSC1/cache_gdsc1.pkl
 gdsc2,0,data/drug-response/GDSC2/cache_gdsc2.pkl
+gdsc1_info,1,data/drug-response/GDSC1/cache_gdsc1.pkl
+gdsc2_info,1,data/drug-response/GDSC2/cache_gdsc2.pkl
+gene_entrez,0,data/gene-expression/CCLE_Public_22Q2/ccle_expression.pkl
+ccle,1,data/gene-expression/CCLE_Public_22Q2/ccle_expression.pkl
+ccle_sample_info,0,data/gene-expression/CCLE_Public_22Q2/ccle_sample_info.pkl
+full_protein_matrix,0,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_processed.pkl
+single_peptide_exclusion_matrix,1,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_processed.pkl
