@@ -16,17 +16,6 @@ from sklearn.datasets import make_regression
 import pandas as pd
 import numpy as np
 
-### Loading data
-
-
-from PathLoader import PathLoader
-
-path_loader = PathLoader('data_config.env', 'current_user.env')
-
-from DataLink import DataLink 
-
-data_link = DataLink(path_loader, 'data_codes.csv')
-
     
 def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper_select_size=10,
                   **kwargs):
@@ -112,7 +101,11 @@ def eval_func(X_test, y_test, pipeline_components=None, **kwargs):
 if __name__ == "__main__": 
     
     ### --- Data Loading Section
-
+    from PathLoader import PathLoader
+    path_loader = PathLoader('data_config.env', 'current_user.env')
+    from DataLink import DataLink
+    data_link = DataLink(path_loader, 'data_codes.csv')
+    
     print('Loading data..')
     
     loading_code = 'ccle-gdsc-1-Palbociclib-LN_IC50'
