@@ -8,7 +8,7 @@ class DataLink:
     
     def __init__(self, path_loader: PathLoader, data_code_database_path) -> None:
         
-        self.pathsHandle = path_loader 
+        self.paths_handle = path_loader 
         self.data_code_database_path = pd.read_csv(data_code_database_path)
         self.data_code_database = {}
 
@@ -32,7 +32,7 @@ class DataLink:
         # handles both csv and pickle files
         
         if file_path.endswith('.csv'):
-            df = pd.read_csv(f'{self.pathsHandle.get_data_path()}{file_path}')
+            df = pd.read_csv(f'{self.paths_handle.get_data_path()}{file_path}')
             self.data_code_database[data_code] = df
             if verbose:
                 print(f'Data code {data_code} loaded at {file_path} with index position {index_position}.')
@@ -40,7 +40,7 @@ class DataLink:
         elif file_path.endswith('.pkl'):
 
             found = False
-            with open(f'{self.pathsHandle.get_data_path()}{file_path}', 'rb') as f:
+            with open(f'{self.paths_handle.get_data_path()}{file_path}', 'rb') as f:
                 for i in range(index_position+1):
                     data = pickle.load(f)
                     if i == index_position:

@@ -23,58 +23,9 @@ from PathLoader import PathLoader
 
 path_loader = PathLoader('data_config.env', 'current_user.env')
 
-### Load data
+from DataLink import DataLink 
 
-import pandas as pd
-import pickle
-
-print('Loading data from biomarker data repository..')
-# import GDSC2 drug response data using pickle
-
-with open(f'{path_loader.get_data_path()}data/drug-response/GDSC2/cache_gdsc2.pkl', 'rb') as f:
-    gdsc2 = pickle.load(f)
-    gdsc2_info = pickle.load(f)
-    
-# import CCLE gene expression data using pickle
-
-with open(f'{path_loader.get_data_path()}data/gene-expression/CCLE_Public_22Q2/ccle_expression.pkl', 'rb') as f:
-    gene_entrez = pickle.load(f)
-    ccle = pickle.load(f)
-
-# import CCLE sample info data using pickle
-
-with open(f'{path_loader.get_data_path()}data/gene-expression/CCLE_Public_22Q2/ccle_sample_info.pkl', 'rb') as f:
-    ccle_sample_info = pickle.load(f)
-
-# import STRING database using pickle
-
-with open(f'{path_loader.get_data_path()}data/protein-interaction/STRING/string_df.pkl', 'rb') as f:
-    string_df = pickle.load(f)
-    string_df_info = pickle.load(f)
-    string_df_alias = pickle.load(f)
-
-
-# import proteomic expression
-with open(f'{path_loader.get_data_path()}data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_fillna_processed.pkl', 'rb') as f:
-    joined_full_protein_matrix = pickle.load(f)
-    joined_sin_peptile_exclusion_matrix = pickle.load(f)
-
-# import STRING database using pickle
-
-with open(f'{path_loader.get_data_path()}data/protein-interaction/STRING/string_df.pkl', 'rb') as f:
-    string_df = pickle.load(f)
-    string_df_info = pickle.load(f)
-    string_df_alias = pickle.load(f)
-
-# open STRING to goncalves mapping file
-
-with open(f'{path_loader.get_data_path()}data\protein-interaction\STRING\goncalve_to_string_id_df.pkl', 'rb') as f:
-    goncalve_to_string_id_df = pickle.load(f)
-
-# open the cache for neighbourhood calculations
-
-with open(f'{path_loader.get_data_path()}data/protein-interaction/STRING/palbociclib_nth_degree_neighbours.pkl', 'rb') as f:
-    nth_degree_neighbours = pickle.load(f)
+data_link = DataLink(path_loader, 'data_codes.csv')
 
     
 def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper_select_size=10,
@@ -162,11 +113,11 @@ if __name__ == "__main__":
     
     ### --- Data Loading Section
 
-    target_variable = "LN_IC50"
-
-    data_df = utils.create_joint_dataset_from_proteome_gdsc("Palbociclib", joined_sin_peptile_exclusion_matrix, gdsc2, drug_value=target_variable)
-    feature_data, label_data = utils.create_feature_and_label(data_df, label_name=target_variable)
+    print('Loading data..')
     
+    loading_code = 'ccle-gdsc-1-Palbociclib-LN_IC50'
+    feature_data, label_data = data_link.get_data_using_code(loading_code)
+    print(f'Data loaded for code {loading_code}')
     
     ### --- Result Saving Configuration 
     
@@ -201,5 +152,4 @@ if __name__ == "__main__":
         print(f'Running powerkit for condition {condition}..')
         rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)  
         # --- actual saving of results for specific conditions 
-        
         quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
