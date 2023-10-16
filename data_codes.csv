@@ -8,3 +8,4 @@ ccle,1,data/gene-expression/CCLE_Public_22Q2/ccle_expression.pkl
 ccle_sample_info,0,data/gene-expression/CCLE_Public_22Q2/ccle_sample_info.pkl
 full_protein_matrix,0,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_processed.pkl
 single_peptide_exclusion_matrix,1,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_processed.pkl
+sy_cancercell2022,0,data\preprocessed\SY-Processed\CancerCell2022_PRISM.csv
