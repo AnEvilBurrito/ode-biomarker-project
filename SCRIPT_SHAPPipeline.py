@@ -80,6 +80,7 @@ def shap_pipeline_func(X_train, y_train,
     return {'model': tuned_model, 
             'selected_features': overlap_features, 
             'scores': scores,
+            'train_data': X_transformed[overlap_features],
             'prelim_selected_features': selected_features,
             'prelim_scores': scores}
 
@@ -103,12 +104,13 @@ def shap_eval_func(X_test, y_test, pipeline_components=None, **kwargs):
     
     ## obtaining SHAP values for each feature, mean absolute SHAP values will 
     ## be used as a way to compute feature importance scores 
-    
-    
+    shap_values = get_shap_values(pipeline_components['model'], 'SVR', pipeline_components['train_data'].sample(n=10), X_selected)
+    mean_shap_values = np.abs(shap_values).mean(axis=0)
+
     ## returning key metrics and results 
 
     # at the end, return a dictionary of all the information you want to return
-    features, scores = pipeline_components['selected_features'], pipeline_components['scores']
+    features, scores = X_selected.columns.tolist(), mean_shap_values.tolist()
     
     return {'model_performance': corr, 
             'p_vals': p_vals, 
