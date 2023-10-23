@@ -6,6 +6,11 @@ gdsc2_info,1,data/drug-response/GDSC2/cache_gdsc2.pkl
 gene_entrez,0,data/gene-expression/CCLE_Public_22Q2/ccle_expression.pkl
 ccle,1,data/gene-expression/CCLE_Public_22Q2/ccle_expression.pkl
 ccle_sample_info,0,data/gene-expression/CCLE_Public_22Q2/ccle_sample_info.pkl
-full_protein_matrix,0,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_processed.pkl
-single_peptide_exclusion_matrix,1,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_processed.pkl
+full_protein_matrix,0,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_fillna_processed.pkl
+single_peptide_exclusion_matrix,1,data/proteomic-expression/goncalves-2022-cell/goncalve_proteome_fillna_processed.pkl
 sy_cancercell2022,0,data\preprocessed\SY-Processed\CancerCell2022_PRISM.csv
+string_df,0,data/protein-interaction/STRING/string_df.pkl
+string_df_info,1,data/protein-interaction/STRING/string_df.pkl
+string_df_alias,2,data/protein-interaction/STRING/string_df.pkl
+goncalve_link_with_string,0,data\protein-interaction\STRING\goncalve_to_string_id_df.pkl
+palbociclib_neighbours_string,0,data/protein-interaction/STRING/palbociclib_nth_degree_neighbours.pkl

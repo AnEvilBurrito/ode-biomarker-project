@@ -1131,6 +1131,12 @@ def get_preset_features(X_train, y_train, X_test, preset_features):
     sel_train, sel_test = X_train[preset_features], X_test[preset_features]
     return preset_features, sel_train, sel_test
 
+
+def select_network_features(X_train, y_train, nth_degree_neighbours, max_gene_target_disance):
+    
+    network_features = nth_degree_neighbours[max_gene_target_disance]
+    return network_features, X_train[network_features]
+
 def select_stat_features(X_train, y_train, selection_size):
     '''
     Select based on f-regression

@@ -60,9 +60,9 @@ class DataLink:
         pandas dataframes. 
         
         Loading codes: 
-            'ccle-gdsc-{number}-{drug_name}-{target_label}': combining CCLE and GDSC data to create a single dataset for a given drug
-            'goncalves-gdsc-{number}-{drug_name}-{target_label}-{full}': combining goncalves and GDSC data to create a single dataset for a given drug
-            'sy-cancercell2022': SY's processed data from Cancer Cell 2022        
+            'ccle-gdsc-{number}-{drug_name}-{target_label}': combining CCLE and GDSC data to create a single dataset for a given drug \n
+            'goncalves-gdsc-{number}-{drug_name}-{target_label}-{full/sin}': combining goncalves and GDSC data to create a single dataset for a given drug \n
+            'sy-cancercell2022': SY's processed data from Cancer Cell 2022 \n       
             
         Returns always two paramters in the following order: 
             feature_data: pandas dataframe of feature data
@@ -90,11 +90,11 @@ class DataLink:
             
             return feature_data, label_data
         
-        if 'goncalve-gdsc' in loading_code: 
+        if 'goncalves-gdsc' in loading_code: 
             # automated combination of goncalves and GDSC1/2 data can be loaded 
             splitted_code = loading_code.split('-')
             gdsc_num, drug_name, target_label, sin_or_full = splitted_code[2], splitted_code[3], splitted_code[4], splitted_code[5]
-            
+
             if sin_or_full == 'full':
                 data_code_to_load = 'full_protein_matrix'
             elif sin_or_full == 'sin':
