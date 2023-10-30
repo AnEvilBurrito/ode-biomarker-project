@@ -24,6 +24,7 @@ import numpy as np
 
     
 def shap_pipeline_func(X_train, y_train, 
+                       rng,
                        nth_degree_neighbors, 
                        use_mrmr=False, 
                        pre_select_size=100, 
@@ -59,7 +60,7 @@ def shap_pipeline_func(X_train, y_train,
     else:
         selected_features, scores = f_regression_select(X_transformed, y_transformed, k=pre_select_size)
         
-    selected_features, X_selected = select_preset_features(X_transformed, y_transformed, selected_features)
+    selected_features, _ = select_preset_features(X_transformed, y_transformed, selected_features)
     
     # assess overlap between network features and selected features
     overlap = set(network_features).intersection(set(selected_features))
@@ -80,9 +81,14 @@ def shap_pipeline_func(X_train, y_train,
     return {'model': tuned_model, 
             'selected_features': overlap_features, 
             'scores': scores,
+            'overlap_ratio': overlap_ratio,
+            'overlap_size': overlap_size,
             'train_data': X_transformed[overlap_features],
             'prelim_selected_features': selected_features,
-            'prelim_scores': scores}
+            'hyperp_results': hp_results,
+            'best_params': best_params,
+            'best_fit_score_hyperp': best_fit_score_hyperp,
+            }
 
 def shap_eval_func(X_test, y_test, pipeline_components=None, **kwargs):
     
@@ -104,7 +110,7 @@ def shap_eval_func(X_test, y_test, pipeline_components=None, **kwargs):
     
     ## obtaining SHAP values for each feature, mean absolute SHAP values will 
     ## be used as a way to compute feature importance scores 
-    shap_values = get_shap_values(pipeline_components['model'], 'SVR', pipeline_components['train_data'].sample(n=10), X_selected)
+    shap_values = get_shap_values(pipeline_components['model'], 'SVR', pipeline_components['train_data'], X_selected)
     mean_shap_values = np.abs(shap_values).mean(axis=0)
 
     ## returning key metrics and results 

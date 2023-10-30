@@ -17,7 +17,7 @@ import pandas as pd
 import numpy as np
 
     
-def pipeline_func(X_train, y_train, use_mrmr=False, pre_select_size=100, wrapper_select_size=10,
+def pipeline_func(X_train, y_train, rng, use_mrmr=False, pre_select_size=100, wrapper_select_size=10,
                   **kwargs):
     
     X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)

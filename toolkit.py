@@ -256,7 +256,7 @@ class Powerkit:
         
         # split the data and go through the pipeline
         X_train, X_test, y_train, y_test = train_test_split(self.feature_data, self.label_data, test_size=self.cv_split_size, random_state=rng)
-        pipeline_comps = pipeline_function(X_train, y_train, **pipeline_args)
+        pipeline_comps = pipeline_function(X_train, y_train, rng, **pipeline_args)
         eval_returns = eval_function(X_test, y_test, pipeline_components=pipeline_comps, **eval_args)
         
         # update the final returns

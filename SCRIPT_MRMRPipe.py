@@ -74,7 +74,7 @@ with open(f'{path_loader.get_data_path()}data/protein-interaction/STRING/palboci
     nth_degree_neighbours = pickle.load(f)
 
     
-def pipeline_func(X_train, y_train, **kwargs):
+def pipeline_func(X_train, y_train, rng, **kwargs):
     
     X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)
     # preliminary feature selection
