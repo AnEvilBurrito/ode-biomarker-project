@@ -11,6 +11,17 @@ class DataLink:
         self.paths_handle = path_loader 
         self.data_code_database_path = pd.read_csv(data_code_database_path)
         self.data_code_database = {}
+        
+    def get_data_from_code(self, data_code, automatic_load=True, verbose=False):
+        if data_code in self.data_code_database.keys():
+            return self.data_code_database[data_code]
+        else:
+            # attempt automatic load 
+            if automatic_load:
+                self.load_data_code(data_code, verbose=verbose)
+                return self.data_code_database[data_code]
+            else:
+                raise Exception(f'Data code {data_code} not found in database. Use load_data_code() to load data.')
 
     def load_all(self, verbose=True):
         
