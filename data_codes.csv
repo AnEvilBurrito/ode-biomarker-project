@@ -14,3 +14,4 @@ string_df_info,1,data/protein-interaction/STRING/string_df.pkl
 string_df_alias,2,data/protein-interaction/STRING/string_df.pkl
 goncalve_link_with_string,0,data\protein-interaction\STRING\goncalve_to_string_id_df.pkl
 palbociclib_neighbours_string,0,data/protein-interaction/STRING/palbociclib_nth_degree_neighbours.pkl
+integrate_ccle_anthony,0,data/anthony_model_adaptation_ccle_csv.csv
