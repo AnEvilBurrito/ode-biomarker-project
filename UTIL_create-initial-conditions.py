@@ -1,5 +1,8 @@
 # This script is used to generate individualised specie initial conditions based on CCLE data and model default initial conditions 
 
+import numpy as np
+import pandas as pd
+
 if __name__ == "__main__": 
     
     ### Bring in CCLE data
@@ -47,24 +50,79 @@ if __name__ == "__main__":
             
     ### Begin to create the initial conditions for the species 
     
+    dataset = []
+    combination_method = 'average'
+    
     for specie_name, specie_value in species_value_dict.items():
         if specie_name in species_ccle_matches:
             matches = species_ccle_matches[specie_name]
-            print(f'{specie_name} {specie_value} {species_ccle_matches[specie_name]}')
             if len(matches) > 1: 
+                print(f'COMBINATION {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
                 # combination normalisation method 
                 # two options:
                 #   1. average combination 
                 #   2. weighted by sample size combination
-                pass 
+                if combination_method == 'average': 
+                    N = len(matches)
+                    all_columns = []
+                    medians = []
+                    sample_row_vals = []
+                    sample_ccle_vals = []
+                    for match in matches: 
+                        gene_column = ccle_df[match]
+                        gene_column_no_zero = gene_column[gene_column != 0]
+                        m = gene_column_no_zero.median()
+                        s = specie_value
+                        normalised_column = gene_column / m
+                        all_columns.append(normalised_column)
+                        medians.append(m)
+                        sample_row_vals.append(normalised_column[0])
+                        sample_ccle_vals.append(gene_column[0])
+                        
+                    all_columns = pd.concat(all_columns, axis=1)
+                    # sum row wise and divide by N, multiply by specie value
+                    sum_row_columns = all_columns.sum(axis=1) / N * s
+                    
+                    # verify logic 
+                    # get the first value of each column in all_columns
+
+                    print('medians', medians)
+                    print('ccle vals', sample_ccle_vals)
+                    print('transformed vals', sample_row_vals)
+                    print('final ratio',all_columns.sum(axis=1)[0] / N)
+                    print('multiply by initial cond', sum_row_columns[0], sum_row_columns.shape)
+                    
+                    # final append
+                    sum_row_columns = list(sum_row_columns)
+                    dataset.append(sum_row_columns) 
+                    
+                elif combination_method == 'weighted': 
+                    # TODO: once this is done, this script is largely complete
+                    pass
             elif len(matches) == 1:
                 # direct normalisation method 
-                pass 
+                print(f'DIRECT {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
+                gene_column = ccle_df[species_ccle_matches[specie_name][0]]
+                gene_column_no_zero = gene_column[gene_column != 0]
+                m = gene_column_no_zero.median()
+                s = specie_value
+                species_column = gene_column / m * s 
+                species_column = list(species_column)
+                print(species_column[0])
+                dataset.append(species_column) 
+                
             else: 
                 # throw error
                 raise ValueError(f'No matches for {specie_name}')
         else: 
             # replace with default value 
-            pass 
-        
-        
+            print(f'REPLACE {specie_name} {specie_value}')
+            
+            specie_value_column = [specie_value] * ccle_df.shape[0]
+            dataset.append(specie_value_column)
+    
+    new_df = pd.DataFrame(dataset).transpose()
+    new_df.columns = species
+    new_df.index = ccle_df['CELLLINE']
+    print(new_df.head())
+    print(new_df.shape)
