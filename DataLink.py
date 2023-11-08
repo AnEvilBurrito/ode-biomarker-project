@@ -40,7 +40,13 @@ class DataLink:
             
     def load_data_code_raw(self, data_code, index_position, file_path, verbose=False):
         
-        # handles both csv and pickle files
+        # handles csv, xlsx and pickle files
+        
+        if file_path.endswith('.xlsx'):
+            df = pd.read_excel(f'{self.paths_handle.get_data_path()}{file_path}')
+            self.data_code_database[data_code] = df
+            if verbose:
+                print(f'Data code {data_code} loaded at {file_path} with index position {index_position}.')
         
         if file_path.endswith('.csv'):
             df = pd.read_csv(f'{self.paths_handle.get_data_path()}{file_path}')
