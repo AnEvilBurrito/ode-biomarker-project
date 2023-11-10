@@ -1,5 +1,7 @@
 # This script is used to generate individualised specie initial conditions based on CCLE data and model default initial conditions 
 
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -51,7 +53,7 @@ if __name__ == "__main__":
     ### Begin to create the initial conditions for the species 
     
     dataset = []
-    combination_method = 'average'
+    combination_method = 'weighted'
     
     for specie_name, specie_value in species_value_dict.items():
         if specie_name in species_ccle_matches:
@@ -65,6 +67,7 @@ if __name__ == "__main__":
                 if combination_method == 'average': 
                     N = len(matches)
                     all_columns = []
+                    # debug operations 
                     medians = []
                     sample_row_vals = []
                     sample_ccle_vals = []
@@ -75,6 +78,7 @@ if __name__ == "__main__":
                         s = specie_value
                         normalised_column = gene_column / m
                         all_columns.append(normalised_column)
+                        # following are debug operations
                         medians.append(m)
                         sample_row_vals.append(normalised_column[0])
                         sample_ccle_vals.append(gene_column[0])
@@ -86,11 +90,11 @@ if __name__ == "__main__":
                     # verify logic 
                     # get the first value of each column in all_columns
 
-                    print('medians', medians)
-                    print('ccle vals', sample_ccle_vals)
-                    print('transformed vals', sample_row_vals)
-                    print('final ratio',all_columns.sum(axis=1)[0] / N)
-                    print('multiply by initial cond', sum_row_columns[0], sum_row_columns.shape)
+                    # print('medians', medians)
+                    # print('ccle vals', sample_ccle_vals)
+                    # print('transformed vals', sample_row_vals)
+                    # print('final ratio',all_columns.sum(axis=1)[0] / N)
+                    # print('multiply by initial cond', sum_row_columns[0], sum_row_columns.shape)
                     
                     # final append
                     sum_row_columns = list(sum_row_columns)
@@ -98,7 +102,39 @@ if __name__ == "__main__":
                     
                 elif combination_method == 'weighted': 
                     # TODO: once this is done, this script is largely complete
-                    pass
+                    all_columns = []
+                    length_vector = []
+                    for match in matches:
+                        gene_column = ccle_df[match]
+                        gene_column_no_zero = gene_column[gene_column != 0]
+                        length = len(gene_column_no_zero)
+                        length_vector.append(length)
+                        m = gene_column_no_zero.median()
+                        s = specie_value
+                        normalised_column = gene_column / m
+                        all_columns.append(normalised_column)
+                    
+                    all_columns = pd.concat(all_columns, axis=1)
+                    length_vector = np.array(length_vector)
+                    length_vector = length_vector / length_vector.sum()
+                    
+                    # multiply by length vector
+                    transformed_columns = all_columns * length_vector
+                    # sum row wise and multiply by specie value
+                    sum_row_columns = transformed_columns.sum(axis=1) * s
+                    
+                    # verify logic
+                    # print('length vector', length_vector)
+                    # print('all columns', list(all_columns.iloc[0]))
+                    # print('transformed vals', list(transformed_columns.iloc[0]))
+                    # print('final ratio', transformed_columns.sum(axis=1)[0])
+                    # print('sum row columns', sum_row_columns[0], sum_row_columns.shape)
+                    
+                    
+                    # final append
+                    sum_row_columns = list(sum_row_columns)
+                    dataset.append(sum_row_columns)
+                    
             elif len(matches) == 1:
                 # direct normalisation method 
                 print(f'DIRECT {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
@@ -126,3 +162,14 @@ if __name__ == "__main__":
     new_df.index = ccle_df['CELLLINE']
     print(new_df.head())
     print(new_df.shape)
+    
+    # --- creating folder name and path
+    folder_name = 'create-initial-conditions'
+
+    if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'):
+        os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')
+
+    file_save_path = f'{path_loader.get_data_path()}data/results/{folder_name}/'
+
+    new_df.to_csv(f'{file_save_path}initial_conditions.csv')
+    print('Done, saved to file')
