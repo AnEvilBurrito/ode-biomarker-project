@@ -5,6 +5,10 @@ import os
 import numpy as np
 import pandas as pd
 
+PARAM_FOLDER_NAME = 'create-initial-conditions'
+PARAM_COMBINATION_METHOD = 'weighted'
+SILENT = True
+
 if __name__ == "__main__": 
     
     ### Bring in CCLE data
@@ -21,7 +25,7 @@ if __name__ == "__main__":
     rr = roadrunner.RoadRunner("data\export_ECC_Base.xml")
     species = rr.model.getFloatingSpeciesIds()
     for idx, specie in enumerate(species):
-        print(f'{idx} {specie} init {rr.model[f"init({specie})"]} curr {rr.model[specie]}')
+        if not SILENT: print(f'{idx} {specie} init {rr.model[f"init({specie})"]} curr {rr.model[specie]}')
     
     ### Bring in spreadsheet for matching rules between CCLE and model species
     
@@ -34,7 +38,7 @@ if __name__ == "__main__":
         specie_name = row['Protein Name']
         ccle_matches = row['CCLE reference']
         ccle_matches = ccle_matches.split(';')
-        print(f'{specie_name}: {ccle_matches}')
+        if not SILENT: print(f'{specie_name}: {ccle_matches}')
         species_ccle_matches[specie_name] = ccle_matches
     
     ### Bring in the initial conditions for the species from best parameter sets for consistency
@@ -53,13 +57,13 @@ if __name__ == "__main__":
     ### Begin to create the initial conditions for the species 
     
     dataset = []
-    combination_method = 'weighted'
+    combination_method = PARAM_COMBINATION_METHOD
     
     for specie_name, specie_value in species_value_dict.items():
         if specie_name in species_ccle_matches:
             matches = species_ccle_matches[specie_name]
             if len(matches) > 1: 
-                print(f'COMBINATION {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
+                if not SILENT: print(f'COMBINATION {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
                 # combination normalisation method 
                 # two options:
                 #   1. average combination 
@@ -137,14 +141,15 @@ if __name__ == "__main__":
                     
             elif len(matches) == 1:
                 # direct normalisation method 
-                print(f'DIRECT {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
+                if not SILENT: print(f'DIRECT {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
                 gene_column = ccle_df[species_ccle_matches[specie_name][0]]
                 gene_column_no_zero = gene_column[gene_column != 0]
                 m = gene_column_no_zero.median()
                 s = specie_value
                 species_column = gene_column / m * s 
                 species_column = list(species_column)
-                print(species_column[0])
+                if not SILENT:
+                    print(species_column[0])
                 dataset.append(species_column) 
                 
             else: 
@@ -152,7 +157,8 @@ if __name__ == "__main__":
                 raise ValueError(f'No matches for {specie_name}')
         else: 
             # replace with default value 
-            print(f'REPLACE {specie_name} {specie_value}')
+            if not SILENT:
+                print(f'REPLACE {specie_name} {specie_value}')
             
             specie_value_column = [specie_value] * ccle_df.shape[0]
             dataset.append(specie_value_column)
@@ -160,11 +166,11 @@ if __name__ == "__main__":
     new_df = pd.DataFrame(dataset).transpose()
     new_df.columns = species
     new_df.index = ccle_df['CELLLINE']
-    print(new_df.head())
-    print(new_df.shape)
+    if not SILENT: print(new_df.head())
+    if not SILENT: print(new_df.shape)
     
     # --- creating folder name and path
-    folder_name = 'create-initial-conditions'
+    folder_name = PARAM_FOLDER_NAME
 
     if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'):
         os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')
