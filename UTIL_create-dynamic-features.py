@@ -98,5 +98,5 @@ if __name__ == "__main__":
 
     file_save_path = f'{path_loader.get_data_path()}data/results/{folder_name}/'
 
-    new_df.to_csv(f'{file_save_path}anthony_model_dynamic_features.csv')
+    new_df.to_csv(f'{file_save_path}ode_dynamic_features.csv')
     print('Done, saved to file')
