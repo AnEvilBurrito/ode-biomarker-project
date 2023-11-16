@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 # HEADER PARAMETERS
-PARAM_INPUT_DATA_CODE = 'dynamic_simulation_data'
+PARAM_INPUT_DATA_CODE = 'dynamic_simulation_data_all'
 PARAM_FOLDER_NAME = 'create-dynamic-features'
 PARAM_NORMALISE_TIME_BASED_VALUES = True 
 
@@ -98,5 +98,7 @@ if __name__ == "__main__":
 
     file_save_path = f'{path_loader.get_data_path()}data/results/{folder_name}/'
 
+    file_name = f'ode_dynamic_features_time_norm.csv' if PARAM_NORMALISE_TIME_BASED_VALUES else f'ode_dynamic_features.csv'
+    
     new_df.to_csv(f'{file_save_path}ode_dynamic_features.csv')
     print('Done, saved to file')
