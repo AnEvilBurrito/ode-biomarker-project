@@ -83,6 +83,9 @@ def shap_pipeline_func(X_train, y_train,
     if use_model == 'ElasticNet':
         model = ElasticNetCV(cv=5, random_state=rng)
         model.fit(X_transformed[overlap_features], y_transformed)
+        
+    else: 
+        raise ValueError(f'Model {use_model} not supported yet, please choose from SVR or ElasticNet')
     
     ## passing key metrics and results to the evaluation function 
     
