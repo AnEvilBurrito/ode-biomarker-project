@@ -43,7 +43,10 @@ def calculate_dynamic_simulation_features(specie, cellline, dynamic_data, normal
     # total fold change (TFC) from 0 to end
     start = specie_data.iloc[0]
     end = specie_data.iloc[-1]
-    tfc = (end - start) / start
+    if start == 0:
+        tfc = end
+    else: 
+        tfc = (end - start) / start
 
     # time to stable value (TSV), a time point t where the value of the specie no longer changes more than 0.01 for all t' > t
     tsv = specie_data.shape[0]
