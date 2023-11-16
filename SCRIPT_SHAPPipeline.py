@@ -29,6 +29,7 @@ def shap_pipeline_func(X_train, y_train,
                        use_mrmr=False, 
                        pre_select_size=100, 
                        max_gene_target_distance=2,
+                       use_model='ElasticNet',
                   **kwargs):
     
     '''
@@ -72,22 +73,27 @@ def shap_pipeline_func(X_train, y_train,
     overlap_features = list(overlap)
 
     ## step 3. training of model (Elastic Net / Linear Regression / SVR / Random Forest / XGBoost / ANN)
-    best_params, best_fit_score_hyperp, hp_results = hypertune_svr(X_transformed[overlap_features], y_transformed, cv=5)
-    tuned_model = SVR(**best_params)
-    tuned_model.fit(X_transformed[overlap_features], y_transformed)
+    if use_model == 'SVR':
+        # best_params, best_fit_score_hyperp, hp_results = hypertune_svr(X_transformed[overlap_features], y_transformed, cv=5)
+        # tuned_model = SVR(**best_params)
+        # tuned_model.fit(X_transformed[overlap_features], y_transformed)
+        model = SVR()
+        model.fit(X_transformed[overlap_features], y_transformed)
+    
+    if use_model == 'ElasticNet':
+        model = ElasticNetCV(cv=5, random_state=rng)
+        model.fit(X_transformed[overlap_features], y_transformed)
     
     ## passing key metrics and results to the evaluation function 
     
-    return {'model': tuned_model, 
+    return {'model': model, 
+            'model_type': use_model,    
             'selected_features': overlap_features, 
             'scores': scores,
             'overlap_ratio': overlap_ratio,
             'overlap_size': overlap_size,
             'train_data': X_transformed[overlap_features],
             'prelim_selected_features': selected_features,
-            'hyperp_results': hp_results,
-            'best_params': best_params,
-            'best_fit_score_hyperp': best_fit_score_hyperp,
             }
 
 def shap_eval_func(X_test, y_test, pipeline_components=None, **kwargs):
@@ -110,17 +116,22 @@ def shap_eval_func(X_test, y_test, pipeline_components=None, **kwargs):
     
     ## obtaining SHAP values for each feature, mean absolute SHAP values will 
     ## be used as a way to compute feature importance scores 
-    shap_values = get_shap_values(pipeline_components['model'], 'SVR', pipeline_components['train_data'], X_selected)
+    shap_values = get_shap_values(pipeline_components['model'], 
+                                  pipeline_components['model_type'],
+                                  pipeline_components['train_data'], 
+                                  X_selected)
     mean_shap_values = np.abs(shap_values).mean(axis=0)
 
     ## returning key metrics and results 
 
-    # at the end, return a dictionary of all the information you want to return
     features, scores = X_selected.columns.tolist(), mean_shap_values.tolist()
-    
+    # at the end, return a dictionary of all the information you want to return
     return {'model_performance': corr, 
             'p_vals': p_vals, 
             'feature_importance': (features, scores),
+            'filter_score': pipeline_components['scores'],
+            'overlap_ratio': pipeline_components['overlap_ratio'],
+            'overlap_size': pipeline_components['overlap_size'],
             }
 
 
@@ -176,6 +187,8 @@ if __name__ == "__main__":
                       'crunch_factor': 1}
 
     rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)
+    
+    quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
 
     # for condition in [condition, condition2]:
     
