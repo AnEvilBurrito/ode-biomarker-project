@@ -4,9 +4,10 @@ import os
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 # HEADER PARAMETERS
-PARAM_INPUT_DATA_CODE = 'dynamic_simulation_data_all'
+PARAM_INPUT_DATA_CODE = 'dynamic_simulation_data_test'
 PARAM_FOLDER_NAME = 'create-dynamic-features'
 PARAM_NORMALISE_TIME_BASED_VALUES = True 
 
@@ -73,14 +74,16 @@ if __name__ == "__main__":
     from DataLink import DataLink
     path_loader = PathLoader('data_config.env', 'current_user.env')
     TheLink = DataLink(path_loader, 'data_codes.csv')
+    
+    print('Loading data..')
     dynamic_data = TheLink.get_data_from_code(PARAM_INPUT_DATA_CODE)
 
     all_species = dynamic_data.columns[2:]
     all_celllines = dynamic_data['Cellline'].unique()
 
+    print('Calculating dynamic features..')
     new_dataset = []
-
-    for c in all_celllines:
+    for c in tqdm(all_celllines):
         cellline_dynamic_features = []
         for s in all_species:
             cellline_dynamic_features.extend(calculate_dynamic_simulation_features(s, c, dynamic_data, PARAM_NORMALISE_TIME_BASED_VALUES))
@@ -100,5 +103,5 @@ if __name__ == "__main__":
 
     file_name = f'ode_dynamic_features_time_norm.csv' if PARAM_NORMALISE_TIME_BASED_VALUES else f'ode_dynamic_features.csv'
     
-    new_df.to_csv(f'{file_save_path}ode_dynamic_features.csv')
+    new_df.to_csv(f'{file_save_path}{file_name}')
     print('Done, saved to file')
