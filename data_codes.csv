@@ -18,3 +18,5 @@ integrate_ccle_anthony,0,data/anthony_model_adaptation_ccle_csv.csv
 best_paramsets_anthony,0,data/MCF7_Top50_PS.xlsx
 dynamic_simulation_data_test,0,data/results/matlab/dynamic_simulation_data.csv
 dynamic_simulation_data_all,0,data/results/matlab/dynamic_simulation_data_all.csv
+dynamic_features,0,data/results/create-dynamic-features/ode_dynamic_features.csv
+dynamic_features_norm,0,data/results/create-dynamic-features/ode_dynamic_features_time_norm.csv
