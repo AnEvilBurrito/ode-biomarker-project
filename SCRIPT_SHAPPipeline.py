@@ -149,13 +149,22 @@ if __name__ == "__main__":
     
     print('Loading data..')
     
-    loading_code = 'goncalves-gdsc-2-Palbociclib-LN_IC50-sin'
+    # load in original ccle data
+    loading_code = 'ccle-gdsc-2-Palbociclib-LN_IC50-sin'
     feature_data, label_data = data_link.get_data_using_code(loading_code)
     print(f'Data loaded for code {loading_code}')
     print('feature data shape:', feature_data.shape, 'label data shape:', label_data.shape)
     # load in neighbors
     data_link.load_data_code('palbociclib_neighbours_string', verbose=False)
     neighbour_data = data_link.data_code_database['palbociclib_neighbours_string']
+    
+    
+    # load in dynamic feature data
+    from DataFunctions import create_feature_and_label, create_joint_dataset_from_ccle_gdsc2
+    
+    dynamic_data = data_link.get_data_from_code('dynamic_simulation_data_all')
+
+    print(label_data.head())
     
     ### --- Result Saving Configuration 
     
@@ -189,9 +198,9 @@ if __name__ == "__main__":
                       'return_meta_df': True,
                       'crunch_factor': 1}
 
-    rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)
+    # rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)
     
-    quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
+    # quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
 
     # for condition in [condition, condition2]:
     
