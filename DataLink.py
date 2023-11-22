@@ -38,7 +38,7 @@ class DataLink:
         else: 
             raise Exception(f'Data code {data_code} not found in database.')
             
-    def load_data_code_raw(self, data_code, index_position, file_path, verbose=False):
+    def load_data_code_raw(self, data_code, index_position, file_path, verbose=False, enforce_raw=True):
         
         # handles csv, xlsx and pickle files
         
@@ -49,10 +49,36 @@ class DataLink:
                 print(f'Data code {data_code} loaded at {file_path} with index position {index_position}.')
         
         if file_path.endswith('.csv'):
+            
+            # attempt to load a cached pkl file first
+            if not enforce_raw:
+                pkl_file_path = file_path.replace('.csv', '.pkl')
+                try:
+                    with open(f'{self.paths_handle.get_data_path()}{pkl_file_path}', 'rb') as f:
+                        for i in range(index_position+1):
+                            data = pickle.load(f)
+                            if i == index_position:
+                                self.data_code_database[data_code] = data
+                                pkl_file_found = True
+                                if verbose:
+                                    print(
+                                        f'Pickle Cached Version of Data code {data_code} loaded at {file_path} with index position {index_position}. Enforced raw loading: {enforce_raw}')
+                                return
+                except FileNotFoundError:
+                    pass
+            
             df = pd.read_csv(f'{self.paths_handle.get_data_path()}{file_path}')
+            csv_file_loaded = True
             self.data_code_database[data_code] = df
             if verbose:
-                print(f'Data code {data_code} loaded at {file_path} with index position {index_position}.')
+                print(f'Data code {data_code} loaded at {file_path} with index position {index_position}. Enforced raw loading: {enforce_raw}')
+            
+            if not enforce_raw:       
+                if verbose:
+                    print(f'Creating a cached pkl file at {pkl_file_path}...')
+                
+                with open(f'{self.paths_handle.get_data_path()}{pkl_file_path}', 'wb') as f:
+                    pickle.dump(df, f)
         
         elif file_path.endswith('.pkl'):
 
@@ -80,6 +106,7 @@ class DataLink:
             'ccle-gdsc-{number}-{drug_name}-{target_label}': combining CCLE and GDSC data to create a single dataset for a given drug \n
             'goncalves-gdsc-{number}-{drug_name}-{target_label}-{full/sin}': combining goncalves and GDSC data to create a single dataset for a given drug \n
             'sy-cancercell2022': SY's processed data from Cancer Cell 2022 \n       
+            'anthony-ode-gdsc-{number}-{drug_name}-{target_label}-{norm/default}': combining anthony's dynamic data and GDSC data to create a single dataset for a given drug \n
             
         Returns always two paramters in the following order: 
             feature_data: pandas dataframe of feature data
@@ -142,5 +169,39 @@ class DataLink:
             whole_df_dropnan = whole_df.dropna(subset=['AUC']) # remove nan values in the label column
             whole_df_dropnan.set_index('Row', inplace=True)
             feature_data, label_data = DataFunctions.create_feature_and_label(whole_df_dropnan, label_name='AUC')
+            
+            return feature_data, label_data
+        
+        if 'anthony-ode-gdsc' in loading_code: 
+            
+            splitted_code = loading_code.split('-')
+            gdsc_num, drug_name, target_label, norm_or_default = splitted_code[3], splitted_code[4], splitted_code[5], splitted_code[6]
+            
+            if norm_or_default == 'norm':
+                data_code_to_load = 'dynamic_features_norm'
+            elif norm_or_default == 'default':
+                data_code_to_load = 'dynamic_features'
+            else:
+                raise Exception(f'Invalid data code for loading anthony-dynamic-gdsc at the end: {norm_or_default}. only "norm" or "default" is allowed.')
+            
+            if data_code_to_load not in self.data_code_database.keys():
+                self.load_data_code(data_code_to_load)
+            dynamic_data = self.data_code_database[data_code_to_load]
+            
+            if f'gdsc{gdsc_num}' not in self.data_code_database.keys():
+                self.load_data_code(f'gdsc{gdsc_num}')
+            gdsc = self.data_code_database[f'gdsc{gdsc_num}']
+            
+            ccle_sample_info = self.get_data_from_code('ccle_sample_info')
+            
+            depmap_to_sanger = ccle_sample_info[['DepMap_ID', 'Sanger_Model_ID']]
+            depmap_to_sanger = depmap_to_sanger.dropna(subset=['Sanger_Model_ID'])
+            
+            dynamic_features = dynamic_data.join(depmap_to_sanger.set_index('DepMap_ID'), on='Unnamed: 0')
+            dynamic_features.drop(columns=['Unnamed: 0'], inplace=True)
+            dynamic_features.set_index('Sanger_Model_ID', inplace=True)
+        
+            whole_df = DataFunctions.create_joint_dataset_from_proteome_gdsc(drug_name, dynamic_features, gdsc, target_label)
+            feature_data, label_data = DataFunctions.create_feature_and_label(whole_df, label_name=target_label)
             
             return feature_data, label_data

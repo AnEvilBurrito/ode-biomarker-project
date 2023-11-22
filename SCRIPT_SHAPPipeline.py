@@ -160,9 +160,7 @@ if __name__ == "__main__":
     
     
     # load in dynamic feature data
-    from DataFunctions import create_feature_and_label, create_joint_dataset_from_ccle_gdsc2
-    
-    dynamic_data = data_link.get_data_from_code('dynamic_simulation_data_all')
+    dynamic_feature_data, dynamic_label_data = data_link.get_data_using_code('anthony-ode-gdsc-2-Palbociclib-LN_IC50-default')
 
     print(label_data.head())
     
