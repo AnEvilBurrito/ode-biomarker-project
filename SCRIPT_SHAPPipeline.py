@@ -22,6 +22,12 @@ from sklearn.datasets import make_regression
 import pandas as pd
 import numpy as np
 
+
+def genenric_pipeline_func(X_train, y_train, rng, use_mrmr=False, pre_select_size=100, use_model='ElasticNet', **kwargs):
+    
+    
+    pass 
+
     
 def shap_pipeline_func(X_train, y_train, 
                        rng,
