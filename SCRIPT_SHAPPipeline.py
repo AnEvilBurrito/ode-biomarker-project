@@ -18,6 +18,9 @@ from sklearn.linear_model import ElasticNetCV
 # import variance threshold
 from sklearn.feature_selection import VarianceThreshold
 
+# import norm scaling
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
 from sklearn.datasets import make_regression
 import pandas as pd
 import numpy as np
@@ -25,8 +28,39 @@ import numpy as np
 
 def genenric_pipeline_func(X_train, y_train, rng, use_mrmr=False, pre_select_size=100, use_model='ElasticNet', **kwargs):
     
+    ## generic pipeline with only filtering and model training using ElasticNet
     
-    pass 
+    # imputing missing values by zero and transforming to uniform distribution
+    X_transformed, y_transformed = transform_impute_by_zero_to_min_uniform(X_train, y_train)
+    # removing features with zero variance to avoid division by zero in f_regression
+    threshold_selector = VarianceThreshold(threshold=0.0)
+    threshold_selector.fit(X_transformed)
+    threshold_columns = X_transformed.columns[threshold_selector.get_support()]
+    X_transformed = X_transformed[threshold_columns]
+    
+    if use_mrmr:
+        selected_features, scores = mrmr_select_fcq(X_transformed, y_transformed, K=pre_select_size, return_index=False)
+    else:
+        selected_features, scores = f_regression_select(X_transformed, y_transformed, k=pre_select_size)
+        
+    selected_features, _ = select_preset_features(X_transformed, y_transformed, selected_features)
+    
+    if use_model == 'ElasticNet':
+        model = ElasticNetCV(cv=5, random_state=rng, max_iter=100000)
+        model.fit(X_transformed[selected_features], y_transformed)
+        
+    else: 
+        raise ValueError(f'Model {use_model} not supported yet, please choose from: ElasticNet')
+    
+    ## passing key metrics and results to the evaluation function 
+    
+    return {'model': model, 
+            'model_type': use_model,    
+            'selected_features': selected_features, 
+            'scores': scores,
+            'prelim_selected_features': selected_features,
+            'train_data': X_transformed[selected_features],
+            }
 
     
 def shap_pipeline_func(X_train, y_train, 
@@ -139,8 +173,6 @@ def shap_eval_func(X_test, y_test, pipeline_components=None, **kwargs):
             'p_vals': p_vals, 
             'feature_importance': (features, scores),
             'filter_score': pipeline_components['scores'],
-            'overlap_ratio': pipeline_components['overlap_ratio'],
-            'overlap_size': pipeline_components['overlap_size'],
             }
 
 
@@ -166,9 +198,10 @@ if __name__ == "__main__":
     
     
     # load in dynamic feature data
-    dynamic_feature_data, dynamic_label_data = data_link.get_data_using_code('anthony-ode-gdsc-2-Palbociclib-LN_IC50-default')
-
-    print(label_data.head())
+    dynamic_loading_code = 'anthony-ode-gdsc-2-Palbociclib-LN_IC50-default'
+    dynamic_feature_data, dynamic_label_data = data_link.get_data_using_code(dynamic_loading_code)
+    print(f'Data loaded for code {dynamic_loading_code}')
+    print('dynamic feature data shape:', dynamic_feature_data.shape, 'dynamic label data shape:', dynamic_label_data.shape)
     
     ### --- Result Saving Configuration 
     
@@ -182,21 +215,25 @@ if __name__ == "__main__":
     
     ### --- Powerkit running configurations
     powerkit = Powerkit(feature_data, label_data) 
+    dynamic_powerkit = Powerkit(dynamic_feature_data, dynamic_label_data)
     
     condition = 'testrun' # running condition name, can be multiple conditions here
-    pipeline_params = {
-        'nth_degree_neighbors': neighbour_data,
-        'use_mrmr': False,
-        'pre_select_size': 100,
-        'max_gene_target_distance': 2
-    }
-    powerkit.add_condition(condition, True, shap_pipeline_func, pipeline_params, shap_eval_func, {})
+    # pipeline_params = {
+    #     'nth_degree_neighbors': neighbour_data,
+    #     'use_mrmr': False,
+    #     'pre_select_size': 100,
+    #     'max_gene_target_distance': 2
+    # }
+    powerkit.add_condition(condition, True, genenric_pipeline_func, {}, shap_eval_func, {})
+    
+    condition2 = 'testrun2'
+    dynamic_powerkit.add_condition(condition2, True, genenric_pipeline_func, {}, shap_eval_func, {})
 
     
     params_profile = {'n_jobs': 1, 
                       'abs_tol': 0.001, 
                       'rel_tol': 0.0001, 
-                      'max_iter': 5, 
+                      'max_iter':50, 
                       'verbose': True,
                       'verbose_level': 1,
                       'return_meta_df': True,
@@ -205,6 +242,8 @@ if __name__ == "__main__":
     # rngs, total_df, meta_df = powerkit.run_until_consensus(condition, **params_profile)
     
     # quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
+    
+    rngs, total_df, meta_df = dynamic_powerkit.run_until_consensus(condition2, **params_profile)
 
     # for condition in [condition, condition2]:
     
