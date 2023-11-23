@@ -203,6 +203,11 @@ if __name__ == "__main__":
     print(f'Data loaded for code {dynamic_loading_code}')
     print('dynamic feature data shape:', dynamic_feature_data.shape, 'dynamic label data shape:', dynamic_label_data.shape)
     
+    # join feature data and dynamic feature data by index
+    combined_feature_data = feature_data.join(dynamic_feature_data, how='inner')
+    print('combined feature data shape:', combined_feature_data.shape)
+
+    
     ### --- Result Saving Configuration 
     
     # --- creating folder name and path
@@ -216,6 +221,7 @@ if __name__ == "__main__":
     ### --- Powerkit running configurations
     powerkit = Powerkit(feature_data, label_data) 
     dynamic_powerkit = Powerkit(dynamic_feature_data, dynamic_label_data)
+    combined_powerkit = Powerkit(combined_feature_data, label_data) 
     
     condition = 'testrun' # running condition name, can be multiple conditions here
     # pipeline_params = {
@@ -228,6 +234,9 @@ if __name__ == "__main__":
     
     condition2 = 'testrun2'
     dynamic_powerkit.add_condition(condition2, True, genenric_pipeline_func, {}, shap_eval_func, {})
+    
+    condition3 = 'testrun3'
+    combined_powerkit.add_condition(condition3, True, genenric_pipeline_func, {}, shap_eval_func, {})
 
     
     params_profile = {'n_jobs': 1, 
@@ -243,8 +252,14 @@ if __name__ == "__main__":
     
     # quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
     
-    rngs, total_df, meta_df = dynamic_powerkit.run_until_consensus(condition2, **params_profile)
+    # rngs, total_df, meta_df = dynamic_powerkit.run_until_consensus(condition2, **params_profile)
 
+    # quick_save_powerkit_results(total_df, meta_df, rngs, condition2, file_save_path)
+    
+    rngs, total_df, meta_df = combined_powerkit.run_until_consensus(condition3, **params_profile)
+    
+    # quick_save_powerkit_results(total_df, meta_df, rngs, condition3, file_save_path)    
+    
     # for condition in [condition, condition2]:
     
     #     print(f'Running powerkit for condition {condition}..')
