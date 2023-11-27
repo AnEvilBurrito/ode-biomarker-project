@@ -252,13 +252,13 @@ if __name__ == "__main__":
     
     # quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_path)
     
-    # rngs, total_df, meta_df = dynamic_powerkit.run_until_consensus(condition2, **params_profile)
+    rngs, total_df, meta_df = dynamic_powerkit.run_until_consensus(condition2, **params_profile)
 
-    # quick_save_powerkit_results(total_df, meta_df, rngs, condition2, file_save_path)
+    quick_save_powerkit_results(total_df, meta_df, rngs, condition2, file_save_path)
     
     rngs, total_df, meta_df = combined_powerkit.run_until_consensus(condition3, **params_profile)
     
-    # quick_save_powerkit_results(total_df, meta_df, rngs, condition3, file_save_path)    
+    quick_save_powerkit_results(total_df, meta_df, rngs, condition3, file_save_path)    
     
     # for condition in [condition, condition2]:
     
