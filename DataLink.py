@@ -41,6 +41,11 @@ class DataLink:
     def load_data_code_raw(self, data_code, index_position, file_path, verbose=False, enforce_raw=True):
         
         # handles csv, xlsx and pickle files
+        '''
+        file_path: string, path to the file to load
+        index_position: int, index position of the data to load from a pickle file
+        enforce_raw: bool, if True, the raw file will be loaded, if False, a cached pkl file will be loaded if available
+        '''
         
         if file_path.endswith('.xlsx'):
             df = pd.read_excel(f'{self.paths_handle.get_data_path()}{file_path}')
@@ -59,7 +64,6 @@ class DataLink:
                             data = pickle.load(f)
                             if i == index_position:
                                 self.data_code_database[data_code] = data
-                                pkl_file_found = True
                                 if verbose:
                                     print(
                                         f'Pickle Cached Version of Data code {data_code} loaded at {file_path} with index position {index_position}. Enforced raw loading: {enforce_raw}')
@@ -107,6 +111,10 @@ class DataLink:
             'goncalves-gdsc-{number}-{drug_name}-{target_label}-{full/sin}': combining goncalves and GDSC data to create a single dataset for a given drug \n
             'sy-cancercell2022': SY's processed data from Cancer Cell 2022 \n       
             'anthony-ode-gdsc-{number}-{drug_name}-{target_label}-{norm/default}': combining anthony's dynamic data and GDSC data to create a single dataset for a given drug \n
+            'generic-gdsc-{number}-{drug_name}-{target_label}-{dataset_name}': 
+                combining generic data and GDSC data to create a single dataset for a given drug, 
+                dataset rows must be in Sanger Model ID format. `dataset_name` will be the loading
+                code for any features of a set of cell lines\n
             
         Returns always two paramters in the following order: 
             feature_data: pandas dataframe of feature data
