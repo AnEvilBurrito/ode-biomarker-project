@@ -73,7 +73,7 @@ if __name__ == "__main__":
                 if not SILENT: print(f'COMBINATION {specie_name} {specie_value} {species_ccle_matches[specie_name]}')
                 # combination normalisation method 
                 # two options:
-                #   1. average combination 
+                #   1. median combination 
                 #   2. weighted by sample size combination
                 if combination_method == 'average': 
                     N = len(matches)
