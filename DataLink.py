@@ -121,6 +121,21 @@ class DataLink:
             label_data: pandas dataframe of label data    
         '''
         
+        if 'generic-gdsc' in loading_code:
+            # automated combination of generic data with sanger model IDs as index and GDSC1/2 data can be loaded 
+            splitted_code = loading_code.split('-')
+            gdsc_num, drug_name, target_label, dataset_name = splitted_code[2], splitted_code[3], splitted_code[4], splitted_code[5]
+            if f'gdsc{gdsc_num}' not in self.data_code_database.keys():
+                self.load_data_code(f'gdsc{gdsc_num}')
+            gdsc = self.data_code_database[f'gdsc{gdsc_num}']
+            if dataset_name not in self.data_code_database.keys():
+                self.load_data_code(dataset_name)
+            generic_data = self.data_code_database[dataset_name]
+            whole_df = DataFunctions.create_joint_dataset_from_proteome_gdsc(drug_name, generic_data, gdsc, target_label)
+            feature_data, label_data = DataFunctions.create_feature_and_label(whole_df, label_name=target_label)
+            
+            return feature_data, label_data
+        
         if 'ccle-gdsc' in loading_code: 
             # automated combination of CCLE and GDSC1/2 data can be loaded 
             

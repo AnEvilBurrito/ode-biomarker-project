@@ -9,7 +9,7 @@ from PathLoader import PathLoader
 from DataLink import DataLink
 
 INPUT_DATA_CODE_EXPRESSION_DATA = 'ccle'
-INPUT_DATA_CODE_MATCH_RULES = 'integrate_ccle_anthony'
+INPUT_DATA_CODE_MATCH_RULES = 'fgfr4_model_ccle_match_rules'
 PARAM_OUTPUT_FOLDER_NAME = 'create-initial-conditions'
 PARAM_COMBINATION_METHOD = 'median' # weighted_median, median and cell_line_specific
 SPECIFIC_CELL_LINE = 'MCF7' # only used when PARAM_COMBINATION_METHOD is 'cell_line_specific'
