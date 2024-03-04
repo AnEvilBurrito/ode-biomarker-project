@@ -22,3 +22,4 @@ dynamic_features,0,data/results/create-dynamic-features/ode_dynamic_features.csv
 dynamic_features_norm,0,data/results/create-dynamic-features/ode_dynamic_features_time_norm.csv
 corr_matrix_ccle_palbociclib,0,data/results/project-drugnet/corr_matrix_ccle_palbociclib.pkl
 fgfr4_model_ccle_match_rules,0,data/ode-models/FGFR4_Model_SY/fgfr4_model_ccle_reference.csv
+fgfr4_ccle_dynamic_features,0,data/results/fgfr4-dynamic-features/dyn_features.csv

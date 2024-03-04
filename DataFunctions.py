@@ -208,6 +208,22 @@ def create_joint_dataset_from_proteome_gdsc(drug_name: str, proteome: pd.DataFra
     return joined_dataset
 
 
+def dataset_to_sanger_model_id_from_ccle(df: pd.DataFrame, ccle_info_df: pd.DataFrame):
+    '''
+    Transforms DepMap_ID based-indices of the dataframe to Sanger_Model_ID
+    input: df: pd.DataFrame, must have 'ACH-000000' formatted index as cell line identifiers 
+    output: pd.DataFrame, with Sanger_Model_ID as index
+    '''
+    ccle_IDs = ccle_info_df[['DepMap_ID', 'Sanger_Model_ID']]
+    ccle_IDs.set_index('DepMap_ID', inplace=True)
+
+    transformed_df = df.join(ccle_IDs, how='inner')
+    # remove rows with NaN for Sanger_Model_ID
+    transformed_df.dropna(subset=['Sanger_Model_ID'], inplace=True)
+    transformed_df.set_index('Sanger_Model_ID', inplace=True)
+    return transformed_df
+    
+
 def create_joint_dataset_from_ccle_gdsc2(drug_name: str,
                                          drug_df: pd.DataFrame,
                                          ccle_df: pd.DataFrame,

@@ -111,7 +111,7 @@ class DataLink:
             'goncalves-gdsc-{number}-{drug_name}-{target_label}-{full/sin}': combining goncalves and GDSC data to create a single dataset for a given drug \n
             'sy-cancercell2022': SY's processed data from Cancer Cell 2022 \n       
             'anthony-ode-gdsc-{number}-{drug_name}-{target_label}-{norm/default}': combining anthony's dynamic data and GDSC data to create a single dataset for a given drug \n
-            'generic-gdsc-{number}-{drug_name}-{target_label}-{dataset_name}': 
+            'generic-gdsc-{number}-{drug_name}-{target_label}-{dataset_name}-{replace_index}-{row_index}': 
                 combining generic data and GDSC data to create a single dataset for a given drug, 
                 dataset rows must be in Sanger Model ID format. `dataset_name` will be the loading
                 code for any features of a set of cell lines\n
@@ -124,14 +124,35 @@ class DataLink:
         if 'generic-gdsc' in loading_code:
             # automated combination of generic data with sanger model IDs as index and GDSC1/2 data can be loaded 
             splitted_code = loading_code.split('-')
-            gdsc_num, drug_name, target_label, dataset_name = splitted_code[2], splitted_code[3], splitted_code[4], splitted_code[5]
+            # replace_index and row_index are optional parameters
+            # replace_index: if true, it is assumed the dataset contains DepMap_Ids, 
+            #                the index of the generic dataset wil be replaced with Sanger Model IDs
+            # row_index: if replace_index is true, this parameter will be used to specify the 
+            #            column name of the dataset that contains the DepMap_IDs
+            gdsc_num, drug_name, target_label, dataset_name, replace_index, row_index = splitted_code[2], splitted_code[3], splitted_code[4], splitted_code[5], splitted_code[6], splitted_code[7]
+            
             if f'gdsc{gdsc_num}' not in self.data_code_database.keys():
                 self.load_data_code(f'gdsc{gdsc_num}')
             gdsc = self.data_code_database[f'gdsc{gdsc_num}']
             if dataset_name not in self.data_code_database.keys():
                 self.load_data_code(dataset_name)
             generic_data = self.data_code_database[dataset_name]
-            whole_df = DataFunctions.create_joint_dataset_from_proteome_gdsc(drug_name, generic_data, gdsc, target_label)
+            
+            # handling optional parameters
+            if replace_index == 'true':
+                # run the index replacement function from DataFunctions
+                if 'ccle_sample_info' not in self.data_code_database.keys():
+                    self.load_data_code('ccle_sample_info')
+                ccle_sample_info = self.data_code_database['ccle_sample_info']
+                
+                if row_index != 'index':
+                    # this option is used for datasets that have DepMap_IDs in a column other than the index
+                    processed_data = generic_data.set_index(row_index)
+                processed_data = DataFunctions.dataset_to_sanger_model_id_from_ccle(processed_data, ccle_sample_info)
+            else: 
+                processed_data = generic_data
+                
+            whole_df = DataFunctions.create_joint_dataset_from_proteome_gdsc(drug_name, processed_data, gdsc, target_label)
             feature_data, label_data = DataFunctions.create_feature_and_label(whole_df, label_name=target_label)
             
             return feature_data, label_data
