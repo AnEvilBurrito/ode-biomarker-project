@@ -1035,8 +1035,20 @@ def f_regression_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
     selected_features = X.columns[selector.get_support()]
     return selected_features, selector.scores_[selector.get_support()]
 
-def pearson_corr_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
-    pass 
+def pearson_corr_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
+    # iterate every column of X, a pd dataframe
+    data_collector = []
+    for (col_name, col_data) in X.items():
+        corr, p_vals = pearsonr(col_data, y)
+        data_collector.append((col_name, corr, p_vals))
+        
+    # sort the data collector by the absolute value of the correlation
+    data_collector = sorted(data_collector, key=lambda x: abs(x[1]), reverse=True)
+    selected_features = [x[0] for x in data_collector[:k]]
+    if kwargs['return_all'] == True: 
+        # NOTE that this breaks the pattern of the return value for feature selection functions
+        return selected_features, [x[1] for x in data_collector[:k]], [x[2] for x in data_collector[:k]]
+    return selected_features, [x[1] for x in data_collector[:k]]
 
 
 def variance_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
