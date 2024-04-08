@@ -1035,6 +1035,13 @@ def f_regression_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
     selected_features = X.columns[selector.get_support()]
     return selected_features, selector.scores_[selector.get_support()]
 
+def mutual_information_select(X: pd.DataFrame, y: pd.Series, k: int, *args):
+    selector = SelectKBest(mutual_info_regression, k=k)
+    selector.fit(X, y)
+    # get the selected features
+    selected_features = X.columns[selector.get_support()]
+    return selected_features, selector.scores_[selector.get_support()]
+
 def pearson_corr_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
     # iterate every column of X, a pd dataframe
     data_collector = []
