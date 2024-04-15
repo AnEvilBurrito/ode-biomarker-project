@@ -1016,7 +1016,7 @@ def relieff_select(X: pd.DataFrame, y: pd.Series, k: int, n_jobs=1):
     if n_jobs >= 1:
         r = sr.RReliefF(n_features = k, n_jobs = n_jobs)
     else: 
-        r = sr.ReliefF(n_features = k)
+        r = sr.RReliefF(n_features = k)
     r.fit(X.to_numpy(), y.to_numpy())
     feat_indices = np.flip(np.argsort(r.w_), 0)[0:k]
     return feat_indices, r.w_[feat_indices]
