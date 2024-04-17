@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pickle
 import logging, sys # for logging
 from typing import Callable
+from collections import Counter
 
 from joblib import Parallel, delayed, cpu_count # for parallel processing
 
@@ -950,12 +951,84 @@ def hypertune_ann(X: pd.DataFrame, y: pd.Series, cv=5, n_jobs=1):
 All feature selection methods should take in the following arguments:
     X: pandas dataframe | numpy array, the data to perform feature selection on
     y: pandas series | numpy array, the label
-    k: int, the number of features to select
+    k: int, the number of features to select, -1 if all features should be selected
     *args: extra arguments
 All feature selection methods should return the following:
     selected_features: list of strings or list of ints representing the indices of the selected features
     scores: list of floats | ints, the scores associated with each selected feature
 '''
+
+def ensemble_percentile_threshold(X: pd.DataFrame, y: pd.Series, k: int, 
+                                  methods: list, method_kwargs: list, method_cutoffs_way: list,
+                                  alpha=0.05, shuffled_iters=1000, n_jobs=1, stable_seeds=True):
+    '''
+    Given a set of feature selection methods, select features which has alpha < 0.05 in any of the methods
+    when compared to feature score distributions based on randomly shuffled label data. 
+    
+    Input:
+        X: pandas dataframe, the training data
+        y: pandas series, the training label
+        k: int, the number of features to select, always set to -1, k is not used in this method
+        method: list of functions, the list of feature selection methods to use
+        method_kwargs: list of dicts, the list of extra arguments for each feature selection method
+        method_cutoffs_way: list of strings, "one_way" or "two_way", the way to determine the cutoff for each method
+        threshold: float, the threshold to select features scores 
+        shuffled_iters: int, the number of iterations to shuffle the label data
+        n_jobs: int, the number of jobs to run in parallel
+        stable_seeds: bool, whether to use stable seeds for reproducibility, stable seeds simply range from 0 to shuffled_iters
+    '''
+    
+    if len(methods) != len(method_kwargs) or len(methods) != len(method_cutoffs_way):
+        raise ValueError('methods, method_kwargs, and method_cutoffs_way should have the same length')
+    
+    # create a list of shuffled labels
+    if stable_seeds:
+        random_seeds = list(range(shuffled_iters))
+    else: 
+        random_seeds = np.random.randint(-100000000, 100000000, size=shuffled_iters)
+    shuffled_label_data = [y.sample(frac=1, random_state=seed) for seed in random_seeds]
+    
+    df_above_threshold_list = []
+    i = 0 
+    while i < len(methods): 
+        method, method_kwarg, method_cutoff_way = methods[i], method_kwargs[i], method_cutoffs_way[i]
+        all_scores = get_shuffled_scores(shuffled_label_data, X, method, method_kwarg, n_jobs=n_jobs)
+        all_scores = [score for score in all_scores if not np.isnan(score)]
+        if method_cutoff_way == 'one_way':
+            percentile_cutoff = 100 - alpha * 100
+            threshold = np.percentile(all_scores, percentile_cutoff)
+            # print(f'percentile cutoff: {percentile_cutoff}, threshold: {threshold}')
+            selected, scores = method(X, y, X.shape[1], **method_kwarg)
+            df = build_dataframe(selected, scores, X)
+            df_above_threshold = df[df['Scores'] > threshold]
+            df_above_threshold_list.append(df_above_threshold)
+        elif method_cutoff_way == 'two_way':
+            all_scores = [score for score in all_scores if not np.isnan(score)]
+            upper_cutoff_value = 100 - (alpha * 100 / 2)
+            lower_cutoff_value = (alpha * 100 / 2)
+            upper_threshold = np.percentile(all_scores, upper_cutoff_value)
+            lower_threshold = np.percentile(all_scores, lower_cutoff_value)
+            # print(f'upper cutoff: {upper_cutoff_value}, upper threshold: {upper_threshold}')
+            # print(f'lower cutoff: {lower_cutoff_value}, lower threshold: {lower_threshold}')
+            selected, scores = method(X, y, X.shape[1], **method_kwarg)
+            df = build_dataframe(selected, scores, X)
+            df = df.dropna()
+            df_above_threshold = df[df['Scores'] > upper_threshold]
+            df_below_threshold = df[df['Scores'] < lower_threshold]
+            # join the two dataframes
+            df_above_threshold = pd.concat([df_above_threshold, df_below_threshold])
+            df_above_threshold_list.append(df_above_threshold)
+        i += 1 
+    
+    union_labels = []
+    for df in df_above_threshold_list:
+        union_labels.extend(df.index.tolist())
+    label_counts = Counter(union_labels)
+
+    scores = [count for _, count in label_counts.items()]
+    features_selected = [label for label, _ in label_counts.items()]
+    return features_selected, scores
+
 
 def mrmr_select_fcq(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_index=True):
 
@@ -1594,3 +1667,63 @@ def quick_save_powerkit_results(total_df, meta_df, rngs, condition, file_save_pa
     # save rngs
     with open(f'{file_save_path}rngs_list_{condition}.pkl', 'wb') as f:
         pickle.dump(rngs, f)
+
+def build_dataframe(selected_indices, scores, feature_data): 
+    # if selected_indices are not indices but labels, skip the label conversion step 
+    if not isinstance(selected_indices[0], int) and not isinstance(selected_indices[0], np.int64):
+        labels = selected_indices
+    else:
+        labels = feature_data.columns[selected_indices]
+    df = pd.DataFrame({'Selected': selected_indices, 'Scores': scores}, index=labels)
+    sorted_df = df.sort_values(by='Scores', ascending=False)
+    return sorted_df
+
+def ensemble_k_rank_select(k: int, selection_methods: list, method_kwargs: list, feature_data: pd.DataFrame, label_data):
+    all_dfs = []
+    assert len(selection_methods) == len(method_kwargs), 'Number of methods and method_kwargs must be equal'
+    for idx, method in enumerate(selection_methods):
+        selected, score = method(feature_data, label_data, feature_data.shape[0], **method_kwargs[idx])
+        df = build_dataframe(selected, score, feature_data)
+        all_dfs.append(df)
+    
+    all_labels = union_df_labels(k,all_dfs)
+    return all_labels
+
+def union_df_labels(k, df_list):
+    all_labels = []
+    for df in df_list:
+        k_best_labels = df.index.tolist()[:k]
+        all_labels.extend(k_best_labels)
+    
+    all_labels = list(set(all_labels))
+    return all_labels
+
+def get_shuffled_scores(shuffled_label_data, feature_data, selection_method, method_kwargs, verbose=1, n_jobs=1):
+    feature_size = feature_data.shape[1]
+    if n_jobs == -1:
+        n_jobs = cpu_count()
+    if n_jobs == 1:
+        all_scores = []
+        for i, label_data in enumerate(shuffled_label_data):
+            selected, score = selection_method(feature_data, label_data, feature_size, **method_kwargs)
+            all_scores.extend(score)
+            if verbose == 1: 
+                print(f'Finished {i+1} out of {len(shuffled_label_data)}')
+    else: 
+        # use joblib to parallelize the process
+        def run_one(label_data):
+            selected, score = selection_method(feature_data, label_data, feature_size, **method_kwargs)
+            return score
+        # process shuffled data 20 at a time, so that we can see progress, then concatenate at the end
+        divide_n = 20
+        if n_jobs > 20:
+            divide_n = 40
+        shuffled_label_data_chunks = [shuffled_label_data[i:i + divide_n] for i in range(0, len(shuffled_label_data), divide_n)]
+        all_scores = []
+        for i, chunk in enumerate(shuffled_label_data_chunks):
+            scores = Parallel(n_jobs=n_jobs)(delayed(run_one)(label_data) for label_data in chunk)
+            all_scores.extend([score for sublist in scores for score in sublist])
+            if verbose == 1: 
+                print(f'Finished {i+1} out of {len(shuffled_label_data_chunks)} chunks')
+                
+    return all_scores
