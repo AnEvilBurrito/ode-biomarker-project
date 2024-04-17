@@ -276,7 +276,7 @@ class Powerkit:
             # use normal loop syntax for verbose printing
             data_collector = []
             for rng in rng_list:
-                for condition in self.conditions.keys():
+                for condition in conditions:
                     data = self._abstract_run_single(condition,
                                                     self.conditions[condition]['condition_to_get_feature_importance'],
                                                     rng,
@@ -299,7 +299,7 @@ class Powerkit:
                                                     verbose=False
                                                     ) 
                                                     for rng in rng_list
-                                                    for condition in self.conditions.keys())
+                                                    for condition in conditions)
             
         df = pd.DataFrame(data_collector)
         return df
