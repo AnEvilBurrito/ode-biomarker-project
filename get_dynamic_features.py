@@ -17,10 +17,11 @@ def get_dynamic_features(col_data: pd.Series,
     start_val = col_data.iloc[0]
     end_val = col_data.iloc[-1]
 
+    tfc = 0 
     if start_val == 0:
         tfc = 1000
     else:
-        if end_val - start_val > 0:
+        if end_val - start_val >= 0:
             tfc = (end_val - start_val) / start_val
         elif end_val - start_val < 0:
             if end_val == 0:
