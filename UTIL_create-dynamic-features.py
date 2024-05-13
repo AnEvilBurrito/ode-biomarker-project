@@ -7,8 +7,8 @@ import pandas as pd
 from tqdm import tqdm
 
 # HEADER PARAMETERS
-PARAM_INPUT_DATA_CODE = 'dynamic_simulation_data_all'
-PARAM_FOLDER_NAME = 'dynamic-features-CDK-AH-v2'
+PARAM_INPUT_DATA_CODE = 'cdk_model_downsampled_simulation'
+PARAM_FOLDER_NAME = 'dynamic-features-CDK-AH-v3'
 PARAM_NORMALISE_TIME_BASED_VALUES = True 
 
 # function to calculate dynamic simulation features for a specie and cell line
