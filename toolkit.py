@@ -960,7 +960,7 @@ All feature selection methods should return the following:
 
 def ensemble_percentile_threshold(X: pd.DataFrame, y: pd.Series, k: int, 
                                   methods: list, method_kwargs: list, method_cutoffs_way: list,
-                                  alpha=0.05, shuffled_iters=1000, n_jobs=1, stable_seeds=True):
+                                  alpha=0.05, shuffled_iters=1000, n_jobs=1, stable_seeds=True, verbose=1):
     '''
     Given a set of feature selection methods, select features which has alpha < 0.05 in any of the methods
     when compared to feature score distributions based on randomly shuffled label data. 
@@ -992,7 +992,7 @@ def ensemble_percentile_threshold(X: pd.DataFrame, y: pd.Series, k: int,
     i = 0 
     while i < len(methods): 
         method, method_kwarg, method_cutoff_way = methods[i], method_kwargs[i], method_cutoffs_way[i]
-        all_scores = get_shuffled_scores(shuffled_label_data, X, method, method_kwarg, n_jobs=n_jobs)
+        all_scores = get_shuffled_scores(shuffled_label_data, X, method, method_kwarg, n_jobs=n_jobs, verbose=verbose)
         all_scores = [score for score in all_scores if not np.isnan(score)]
         if method_cutoff_way == 'one_way':
             percentile_cutoff = 100 - alpha * 100
