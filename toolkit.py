@@ -10,6 +10,7 @@ from typing import Callable
 from collections import Counter
 
 from joblib import Parallel, delayed, cpu_count # for parallel processing
+from tqdm import tqdm # for progress bar
 
 # external imports
 import numpy as np
@@ -275,7 +276,7 @@ class Powerkit:
         if n_jobs == 1:
             # use normal loop syntax for verbose printing
             data_collector = []
-            for rng in rng_list:
+            for rng in tqdm(rng_list):
                 for condition in conditions:
                     data = self._abstract_run_single(condition,
                                                     self.conditions[condition]['condition_to_get_feature_importance'],
