@@ -25,8 +25,10 @@ if __name__ == "__main__":
     print('Loading data..')
     simulation_data = TheLink.get_data_from_code(PARAM_INPUT_DATA_CODE)
 
-    all_species = simulation_data.columns[2:]
+    all_species = list(simulation_data.columns[2:])
     all_celllines = simulation_data['Cellline'].unique()
+    if 'Time' in all_species:
+        all_species.remove('Time')
 
     print('Calculating dynamic features..')
     new_dataset = []
