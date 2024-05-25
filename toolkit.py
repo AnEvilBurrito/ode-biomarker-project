@@ -1268,19 +1268,16 @@ All transform functions should return the following:
     y: pandas series, the training label after transformation
 '''
 
-def impute_by_first_quantile(X_train, y_train, X_test):
+def impute_by_first_quantile(X, y):
     '''
-    TODO: Plan for deprecation, this function is not compliant with the Tranforming functions pattern
+    Fixed 
     '''
     # fit the imputer
     imputer = FirstQuantileImputer()
-    imputer.fit(X_train)
+    imputer.fit(X)
     # transform the data
-    X_train = imputer.transform(X_train, return_df=True)
-    imputer = FirstQuantileImputer()
-    imputer.fit(X_test)
-    X_test = imputer.transform(X_test, return_df=True)
-    return X_train, y_train, X_test
+    X = imputer.transform(X, return_df=True)
+    return X, y
 
 def impute_by_zero(X_train, y_train, X_test):
     '''
