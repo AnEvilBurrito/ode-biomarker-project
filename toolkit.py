@@ -1595,17 +1595,19 @@ def get_mean_contribution_general(scores, strict_mean=0.25, adjust_for_accuracy=
     
     return mean_scores_df    
     
-def get_variation(df, condition, use_iqr=True, strict_mean=0.75):
+def get_variation(df, condition, use_iqr=True, strict_mean=0.75, col_name='feature_importance'):
     
-    # NOTE: df must contain a column called 'feature_importance' with a tuple of (features, scores)
+    # NOTE: df must contain a column called 'col_name' with a tuple of (features, scores)
     # a column called 'rng' with the rng values is also required
     # ideally, n needs to be large enough to get a good estimate of the variability
+    # NOTE: variability_score is the relative standard deviation of the feature importance scores 
+    # for mean/std calculations
     
     # first, condition is needed to filter the dataframe
     df = df[df['condition'] == condition]
     
     list_of_dict = []
-    feature_importance_df = df['feature_importance']
+    feature_importance_df = df[col_name]
     for row in feature_importance_df:
         for x,y in zip(row[0], row[1]):
             # print(f'Feature: {x}, Score: {y}')
