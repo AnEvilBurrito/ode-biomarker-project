@@ -478,7 +478,6 @@ class Powerkit:
 
 '''
 
-
 ### evaluation functions 
 '''
 
