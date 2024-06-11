@@ -48,7 +48,7 @@ class DataLink:
         '''
         
         if file_path.endswith('.xlsx'):
-            df = pd.read_excel(f'{self.paths_handle.get_data_path()}{file_path}')
+            df = pd.read_excel(f'{self.paths_handle.get_data_path()}{file_path}', sheet_name=index_position)
             self.data_code_database[data_code] = df
             if verbose:
                 print(f'Data code {data_code} loaded at {file_path} with index position {index_position}.')
@@ -88,9 +88,9 @@ class DataLink:
 
             found = False
             with open(f'{self.paths_handle.get_data_path()}{file_path}', 'rb') as f:
-                for i in range(index_position+1):
+                for i in range(int(index_position)+1):
                     data = pickle.load(f)
-                    if i == index_position:
+                    if i == int(index_position):
                         self.data_code_database[data_code] = data
                         found = True
                         if verbose:
