@@ -30,5 +30,7 @@ cdk46_ccle_dynamic_features_v2,0,data\\results\\dynamic-features-CDK-AH-v2\\ode_
 cdk_model_raw_simulation,0,data/results/matlab/dynamic_simulation_data_all.csv
 cdk_model_downsampled_simulation,0,data\\results\\cdk_model_simulation_downsample\\cdk_down_sampled.csv
 cdk46_ccle_dynamic_features_v3,0,data\\results\\dynamic-features-CDK-AH-v3\\ode_dynamic_features_time_norm.csv
-ccle_protein_expression,Normalized Protein Expression,data\\proteomic-expression\\ccle-2019-cell\\ccle_normalised_protein_levels.xlsx
-ccle_protein_expression_info,Sample_Information,data\\proteomic-expression\\ccle-2019-cell\\ccle_proteomics_cell_line_info.xlsx
+ccle_protein_expression_raw,Normalized Protein Expression,data\\proteomic-expression\\ccle-2019-cell\\ccle_normalised_protein_levels.xlsx
+ccle_protein_expression_info_raw,Sample_Information,data\\proteomic-expression\\ccle-2019-cell\\ccle_proteomics_cell_line_info.xlsx
+ccle_protein_expression,0,data\\proteomic-expression\\ccle-2019-cell\\ccle_proteomics_processed.pkl
+ccle_protein_expression_info,0,data\\proteomic-expression\\ccle-2019-cell\\ccle_proteomics_info.pkl
