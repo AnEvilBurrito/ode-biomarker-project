@@ -1142,7 +1142,8 @@ def wrapper_rfs_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
     pass 
 
 def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int, 
-                              model: BaseEstimator, start_feature: str, cv: int, 
+                              model: BaseEstimator, start_feature: str, 
+                              cv: int,
                               scoring_method: str='r2', verbose=0):
     '''
     
@@ -1152,7 +1153,7 @@ def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int,
     scores = []
     
     selected.append(start_feature)
-    score = cross_val_score(model, X[selected], y, cv=cv, scoring='r2').mean()
+    score = cross_val_score(model, X[selected], y, cv=cv, scoring=scoring_method).mean()
     
     remaining_features = X.columns.to_list()
     remaining_features.remove(start_feature)
@@ -1161,7 +1162,7 @@ def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int,
         max_score = -10000
         for f in remaining_features: 
             selected.append(f)
-            score = cross_val_score(model, X[selected], y, cv=cv, scoring='r2').mean()
+            score = cross_val_score(model, X[selected], y, cv=cv, scoring=scoring_method).mean()
             if score > max_score:
                 max_score = score
                 max_feature = f
@@ -1174,6 +1175,62 @@ def greedy_feedforward_select(X: pd.DataFrame, y: pd.Series, k: int,
     
     return selected, scores
 
+def greedy_feedforward_select_sy(X: pd.DataFrame, y: pd.Series, k: int, 
+                                model: BaseEstimator, start_feature: str, 
+                                cv: int, 
+                                verbose=0):
+    '''
+    
+    '''
+    
+    selected = []
+    scores = []
+    
+    selected.append(start_feature)
+    
+    # split the data into training and testing in cross validation folds 
+    score = 0
+    kf = KFold(n_splits=cv)
+    for i, (train_index, test_index) in enumerate(kf.split(X)):
+        X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+        y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+        
+        model.fit(X_train[selected], y_train)
+        y_pred = model.predict(X_test[selected])
+        s, _ = pearsonr(y_test, y_pred)
+        score += s
+    score /= cv
+    scores.append(score)
+    
+    remaining_features = X.columns.to_list()
+    remaining_features.remove(start_feature)
+    
+    while len(selected) < k:
+        max_score = -10000
+        for f in remaining_features: 
+            selected.append(f)
+            kf = KFold(n_splits=cv)
+            score = 0
+            for i, (train_index, test_index) in enumerate(kf.split(X)):
+                X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+                y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+                model.fit(X_train[selected], y_train)
+                y_pred = model.predict(X_test[selected])
+                s, _ = pearsonr(y_test, y_pred)
+                score += s
+            score /= cv
+            
+            if score > max_score:
+                max_score = score
+                max_feature = f
+            selected.pop()
+        selected.append(max_feature)
+        scores.append(max_score)
+        remaining_features.remove(max_feature)
+        if verbose == 1:
+            print(f'Feature Selected: {max_feature}, Score: {max_score}, Feature Size: {len(selected)}')
+    
+    return selected, scores, model
 
 ### Selection functions
 '''
