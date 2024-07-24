@@ -276,7 +276,7 @@ class Powerkit:
         if n_jobs == 1:
             # use normal loop syntax for verbose printing
             data_collector = []
-            for rng in tqdm(rng_list):
+            for rng in tqdm(rng_list, disable=not verbose):
                 for condition in conditions:
                     data = self._abstract_run_single(condition,
                                                     self.conditions[condition]['condition_to_get_feature_importance'],
