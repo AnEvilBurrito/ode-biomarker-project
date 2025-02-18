@@ -865,6 +865,7 @@ def get_model_from_string(model_name, **kwargs):
         raise ValueError(f'{model_name} is not supported')
     
 def get_shap_values(model, model_str, train_data, test_data):
+    # generic shap value calculation wrapper 
     if model_str == 'RandomForestRegressor':
         explainer = shap.TreeExplainer(model, train_data)
     elif model_str == 'ElasticNet':
