@@ -53,7 +53,8 @@ from sklearn.metrics import mean_squared_error, accuracy_score
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 from sklearn.base import clone
 import sklearn_relief as sr
-
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 # hyperparameter tuning
 from sklearn.model_selection import GridSearchCV
@@ -854,9 +855,11 @@ def get_model_from_string(model_name, **kwargs):
     elif model_name == 'RandomForestRegressor':
         return RandomForestRegressor(**kwargs)
     elif model_name == 'SVR':
-        return SVR(**kwargs)
+        svr = SVR(**kwargs)
+        return Pipeline([('scaler', StandardScaler()), ('svr', svr)])
     elif model_name == 'MLPRegressor':
-        return MLPRegressor(**kwargs)
+        nn = MLPRegressor(**kwargs)
+        return Pipeline([('scaler', StandardScaler()), ('nn', nn)])
     elif model_name == 'XGBRegressor':
         return XGBRegressor(**kwargs)
     elif model_name == 'KNeighborsRegressor':
