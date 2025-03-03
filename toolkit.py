@@ -870,11 +870,11 @@ def get_model_from_string(model_name, **kwargs):
 def get_shap_values(model, model_str, train_data, test_data):
     # generic shap value calculation wrapper 
     if model_str == 'RandomForestRegressor':
-        explainer = shap.TreeExplainer(model, train_data)
+        explainer = shap.TreeExplainer(model)
     elif model_str == 'ElasticNet':
         explainer = shap.LinearExplainer(model, train_data)
     elif model_str == 'XGBRegressor':
-        explainer = shap.TreeExplainer(model, train_data)
+        explainer = shap.TreeExplainer(model)
     # TODO: tensorflow error for this one, fix
     # elif model_str == 'MLPRegressor':
     #     explainer = shap.DeepExplainer(model, train_data)
