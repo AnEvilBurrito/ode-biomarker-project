@@ -25,7 +25,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVR
 
 # import elastic net regression model
-from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import ElasticNet, LinearRegression
 
 # import simple mlp regression model
 from sklearn.neural_network import MLPRegressor
@@ -852,6 +852,8 @@ class Toolkit:
 def get_model_from_string(model_name, **kwargs):
     if model_name == 'ElasticNet':
         return ElasticNet(**kwargs)
+    if model_name == 'LinearRegression':
+        return LinearRegression(**kwargs)
     elif model_name == 'RandomForestRegressor':
         return RandomForestRegressor(**kwargs)
     elif model_name == 'SVR':
@@ -871,15 +873,21 @@ def get_shap_values(model, model_str, train_data, test_data):
     # generic shap value calculation wrapper 
     if model_str == 'RandomForestRegressor':
         explainer = shap.TreeExplainer(model)
-    elif model_str == 'ElasticNet':
+    elif model_str == 'ElasticNet' or model_str == 'LinearRegression':
         explainer = shap.LinearExplainer(model, train_data)
     elif model_str == 'XGBRegressor':
         explainer = shap.TreeExplainer(model)
     # TODO: tensorflow error for this one, fix
     # elif model_str == 'MLPRegressor':
+    #     # model might be in a pipeline, so get the last step
+    #     if hasattr(model, 'named_steps'):
+    #         model = model.named_steps['nn']
     #     explainer = shap.DeepExplainer(model, train_data)
     else:
-        explainer = shap.KernelExplainer(model.predict, train_data)
+        # if train_data is too large (>50), then sample the data
+        if train_data.shape[0] > 50:
+            train_data = shap.kmeans(train_data, 50)
+        explainer = shap.KernelExplainer(lambda x: model.predict(x), train_data)
     shap_values = explainer.shap_values(test_data)
     return shap_values
 

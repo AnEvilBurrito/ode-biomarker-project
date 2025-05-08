@@ -85,6 +85,7 @@ def shap_eval_func(X_test, y_test, pipeline_components=None, **kwargs):
     features, scores = X_selected.columns.tolist(), mean_shap_values.tolist()
     # at the end, return a dictionary of all the information you want to return
     return {'model_used': pipeline_components['model_type'],
+            'prediction_target': 'cell_LNIC50',
             'model_performance': corr, 
             'pearson_p_vals': p_vals, 
             'r_squared': r2,
