@@ -177,3 +177,4 @@ data/processed-results
 
 # ignore current user, so that we can run the code on different machines
 current_user.env
+drug_response_models.pkl
