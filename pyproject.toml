@@ -1,0 +1,32 @@
+[project]
+name = "ode-biomarker-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "importlib-resources==5.12.0",
+    "iprogress>=0.4",
+    "ipykernel==6.25.1",
+    "ipywidgets==8.1.2",
+    "jupyter>=1.1.1",
+    "libroadrunner>=2.8.0",
+    "openpyxl==3.0.10",
+    "pip==23.1.2",
+    "pip-chill==1.0.3",
+    "pipdeptree==2.13.0",
+    "pipreqs==0.4.13",
+    "pubchempy==1.0.4",
+    "python-libsbml==5.20.1",
+    "pyvis==0.3.2",
+    "scikeras==0.9.0",
+    "seaborn==0.11.2",
+    "session-info==1.0.0",
+    "shap==0.42.1",
+    "sklearn-relief==1.0.0b2",
+    "skorch==0.15.0",
+    "statsmodels==0.14.0",
+    "tifffile==2023.3.21",
+    "umap-learn==0.5.6",
+    "xgboost==1.7.5",
+]
