@@ -1,6 +1,5 @@
 # package specific imports
 from typing import Literal
-import Visualisation as vis
 import matplotlib.pyplot as plt
 
 ## python imports
@@ -420,7 +419,7 @@ class Powerkit:
 
                 if isinstance(prev_contrib, int):
                     if verbose and verbose_level >= 3:
-                        print(f'prev_contrb is 0, setting prev_contrb to current_contrib')
+                        print('prev_contrb is 0, setting prev_contrb to current_contrib')
                     prev_contrib = self.get_mean_contribution(total_df, condition, strict_mean=0, col_name=feature_importance_col_name)
                     # strict mean = 0, sum only at the end
                     if verbose and verbose_level >= 1:
