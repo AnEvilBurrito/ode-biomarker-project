@@ -182,6 +182,7 @@ def create_feature_selection_pipeline(
 
 
 # %%
+# %%
 def feature_selection_eval(
     X_test: pd.DataFrame,
     y_test: pd.Series,
@@ -202,23 +203,36 @@ def feature_selection_eval(
     # Transform test data
     X_test_imp = imputer.transform(X_test, return_df=True)
 
-    # Apply same filtering as in training
+    # Apply same filtering as in training BUT ensure features exist in test data
     corr_keep_cols = _drop_correlated_columns(X_test_imp, threshold=0.95)
     X_test_filtered = X_test_imp[corr_keep_cols]
 
+    # KEY FIX: Only select features that actually exist in the filtered test data
+    available_features = [f for f in selected if f in X_test_filtered.columns]
+
+    if len(available_features) == 0:
+        # Fallback: if no selected features are available, use all filtered features
+        available_features = X_test_filtered.columns.tolist()[
+            : min(len(selected), X_test_filtered.shape[1])
+        ]
+
     # Select features and standardize
     X_test_sel = (
-        X_test_filtered[selected] if len(selected) > 0 else X_test_filtered.iloc[:, :0]
-    )
-    X_test_scaled = scaler.transform(X_test_sel) if len(selected) > 0 else X_test_sel
-    X_test_scaled = (
-        pd.DataFrame(X_test_scaled, index=X_test_filtered.index, columns=selected)
-        if len(selected) > 0
-        else X_test_sel
+        X_test_filtered[available_features]
+        if len(available_features) > 0
+        else X_test_filtered.iloc[:, :0]
     )
 
+    if len(available_features) > 0:
+        X_test_scaled = scaler.transform(X_test_sel)
+        X_test_scaled = pd.DataFrame(
+            X_test_scaled, index=X_test_filtered.index, columns=available_features
+        )
+    else:
+        X_test_scaled = X_test_sel
+
     # Predict
-    if len(selected) == 0:
+    if len(available_features) == 0:
         y_pred = np.full_like(
             y_test.values, fill_value=float(y_test.mean()), dtype=float
         )
@@ -248,14 +262,14 @@ def feature_selection_eval(
         "n_test_samples_used": len(y_t),
     }
 
-    # Feature importance
-    if hasattr(model, "feature_importances_") and len(selected) > 0:
-        fi = (np.array(selected), model.feature_importances_)
-    elif model_name in ("LinearRegression",) and len(selected) > 0:
-        coef = getattr(model, "coef_", np.zeros(len(selected)))
-        fi = (np.array(selected), np.abs(coef))
+    # Feature importance (use available features only)
+    if hasattr(model, "feature_importances_") and len(available_features) > 0:
+        fi = (np.array(available_features), model.feature_importances_)
+    elif model_name in ("LinearRegression",) and len(available_features) > 0:
+        coef = getattr(model, "coef_", np.zeros(len(available_features)))
+        fi = (np.array(available_features), np.abs(coef))
     else:
-        fi = (np.array(selected), np.zeros(len(selected)))
+        fi = (np.array(available_features), np.zeros(len(available_features)))
 
     primary = metrics.get(metric_primary, metrics["r2"])
 
@@ -265,14 +279,15 @@ def feature_selection_eval(
         "model_performance": float(primary) if primary is not None else np.nan,
         "metrics": metrics,
         "selection_time": selection_time,
-        "n_features_selected": len(selected),
+        "n_features_selected": len(available_features),  # Use actual available count
         "model_name": model_name,
         "rng": pipeline_components.get("rng", None),
-        "selected_features": selected,
+        "selected_features": available_features,  # Return what was actually used
         "selector_scores": pipeline_components.get("selector_scores", []),
         "y_pred": y_p,
         "y_true_index": y_test.index[mask_fin],
     }
+
 
 # %% [markdown]
 # ## Execution 
