@@ -1,6 +1,5 @@
 # package specific imports
 from typing import Literal
-import Visualisation as vis
 import matplotlib.pyplot as plt
 
 ## python imports
