@@ -118,70 +118,81 @@ def create_feature_selection_pipeline(
     """Create pipeline for feature selection methods"""
 
     def pipeline_function(X_train: pd.DataFrame, y_train: pd.Series, rng: int):
-        # 1) Imputation
+        # 1) Sanitize inputs and imputation
+        X_train = X_train.replace([np.inf, -np.inf], np.nan)
+        y_train = pd.Series(y_train).replace([np.inf, -np.inf], np.nan)
+        mask = ~y_train.isna()
+        X_train, y_train = X_train.loc[mask], y_train.loc[mask]
+
+        # 2) Imputation
         imputer = FirstQuantileImputer().fit(X_train)
-        X_train_imp = imputer.transform(X_train, return_df=True)
+        Xtr = imputer.transform(X_train, return_df=True).astype(float)
+        Xtr = Xtr.fillna(0.0)
 
-        # 2) Optional: variance threshold and correlation filtering
-        vt_keep_cols = list(X_train_imp.columns)  # Keep all initially
-        corr_keep_cols = _drop_correlated_columns(X_train_imp, threshold=0.95)
-        X_train_filtered = X_train_imp[corr_keep_cols]
+        # 3) Correlation filtering (applied to both train and test)
+        # Use the working function from your baseline code [1]
+        corr_keep_cols = _drop_correlated_columns(Xtr, threshold=0.95)
+        Xtr_filtered = Xtr[corr_keep_cols]
 
-        # 3) Feature selection with timing
-        start_time = time.time()
-        selected_features, selector_scores = selection_method(
-            X_train_filtered, y_train, k
-        )
-        selection_time = time.time() - start_time
+        # 4) Feature selection
+        k_sel = min(k, Xtr_filtered.shape[1]) if Xtr_filtered.shape[1] > 0 else 0
+        if k_sel == 0:
+            selected_features, selector_scores = [], np.array([])
+            no_features = True
+        else:
+            selected_features, selector_scores = selection_method(
+                Xtr_filtered, y_train, k_sel
+            )
+            no_features = False
 
-        # 4) Standardization (mandatory for our model suite)
-        scaler = StandardScaler()
-        sel_train_scaled = scaler.fit_transform(X_train_filtered[selected_features])
-        sel_train_scaled = pd.DataFrame(
-            sel_train_scaled, index=X_train_filtered.index, columns=selected_features
-        )
-
-        # 5) Train model
-        if len(selected_features) == 0:
+        # 5) Standardization and model training
+        if no_features or len(selected_features) == 0:
             model = DummyRegressor(strategy="mean")
             model_type = "DummyRegressor(mean)"
             model_params = {"strategy": "mean"}
+            sel_train = Xtr_filtered.iloc[:, :0]
         else:
-            # Get model based on model_name parameter
+            sel_train = Xtr_filtered[selected_features]
+            scaler = StandardScaler()
+            sel_train_scaled = scaler.fit_transform(sel_train)
+            sel_train_scaled = pd.DataFrame(
+                sel_train_scaled, index=sel_train.index, columns=selected_features
+            )
+
+            # Train model
             if model_name == "LinearRegression":
                 model = get_model_from_string("LinearRegression")
-                model_params = {"fit_intercept": True}
             elif model_name == "KNeighborsRegressor":
                 model = get_model_from_string(
                     "KNeighborsRegressor", n_neighbors=5, weights="distance", p=2
                 )
-                model_params = {"n_neighbors": 5, "weights": "distance", "p": 2}
             elif model_name == "SVR":
                 model = get_model_from_string("SVR", kernel="linear", C=1.0)
-                model_params = {"kernel": "linear", "C": 1.0}
             else:
                 raise ValueError(f"Unsupported model: {model_name}")
 
             model.fit(sel_train_scaled, y_train)
             model_type = model_name
+            model_params = (
+                model.get_params(deep=False) if hasattr(model, "get_params") else {}
+            )
 
         return {
             "imputer": imputer,
-            "scaler": scaler,
+            "corr_keep_cols": corr_keep_cols,
             "selected_features": list(selected_features),
             "selector_scores": np.array(selector_scores),
-            "selection_time": selection_time,
-            "method_name": method_name,
             "model": model,
             "model_type": model_type,
             "model_params": model_params,
+            "scaler": scaler if not no_features else None,
+            "no_features": no_features,
             "rng": rng,
         }
 
     return pipeline_function
 
 
-# %%
 # %%
 def feature_selection_eval(
     X_test: pd.DataFrame,
@@ -192,54 +203,47 @@ def feature_selection_eval(
 ) -> Dict:
     """Evaluation function for feature selection benchmarking"""
 
-    # Unpack pipeline components
+    # Unpack components following the structure from working baseline code [1]
     imputer = pipeline_components["imputer"]
-    scaler = pipeline_components["scaler"]
-    selected = pipeline_components["selected_features"]
-    selection_time = pipeline_components["selection_time"]
+    corr_keep = set(pipeline_components["corr_keep_cols"])
+    selected = list(pipeline_components["selected_features"])
+    selector_scores = pipeline_components["selector_scores"]
     model = pipeline_components["model"]
     model_name = pipeline_components["model_type"]
+    scaler = pipeline_components.get("scaler", None)
+    no_features = pipeline_components.get("no_features", False)
 
-    # Transform test data
-    X_test_imp = imputer.transform(X_test, return_df=True)
+    # Apply identical transforms as training
+    X_test = X_test.replace([np.inf, -np.inf], np.nan)
+    y_test = pd.Series(y_test).replace([np.inf, -np.inf], np.nan)
+    mask_y = ~y_test.isna()
+    X_test, y_test = X_test.loc[mask_y], y_test.loc[mask_y]
 
-    # Apply same filtering as in training BUT ensure features exist in test data
-    corr_keep_cols = _drop_correlated_columns(X_test_imp, threshold=0.95)
-    X_test_filtered = X_test_imp[corr_keep_cols]
+    Xti = imputer.transform(X_test, return_df=True).astype(float).fillna(0.0)
 
-    # KEY FIX: Only select features that actually exist in the filtered test data
-    available_features = [f for f in selected if f in X_test_filtered.columns]
+    # Apply same correlation filtering as training [1]
+    cols_after_corr = [c for c in Xti.columns if c in corr_keep]
+    Xti = Xti[cols_after_corr]
 
-    if len(available_features) == 0:
-        # Fallback: if no selected features are available, use all filtered features
-        available_features = X_test_filtered.columns.tolist()[
-            : min(len(selected), X_test_filtered.shape[1])
-        ]
+    # Select features
+    Xsel = Xti[selected] if len(selected) > 0 else Xti.iloc[:, :0]
 
-    # Select features and standardize
-    X_test_sel = (
-        X_test_filtered[available_features]
-        if len(available_features) > 0
-        else X_test_filtered.iloc[:, :0]
-    )
-
-    if len(available_features) > 0:
-        X_test_scaled = scaler.transform(X_test_sel)
-        X_test_scaled = pd.DataFrame(
-            X_test_scaled, index=X_test_filtered.index, columns=available_features
-        )
+    # Standardize if scaler exists (i.e., features were selected)
+    if scaler is not None and len(selected) > 0:
+        Xsel_scaled = scaler.transform(Xsel)
+        Xsel_scaled = pd.DataFrame(Xsel_scaled, index=Xsel.index, columns=selected)
     else:
-        X_test_scaled = X_test_sel
+        Xsel_scaled = Xsel
 
     # Predict
-    if len(available_features) == 0:
+    if no_features or Xsel.shape[1] == 0:
         y_pred = np.full_like(
             y_test.values, fill_value=float(y_test.mean()), dtype=float
         )
     else:
-        y_pred = np.asarray(model.predict(X_test_scaled), dtype=float)
+        y_pred = np.asarray(model.predict(Xsel_scaled), dtype=float)
 
-    # Calculate metrics
+    # Calculate metrics (following the exact structure from baseline_eval [1])
     mask_fin = np.isfinite(y_test.values) & np.isfinite(y_pred)
     y_t = y_test.values[mask_fin]
     y_p = y_pred[mask_fin]
@@ -262,14 +266,14 @@ def feature_selection_eval(
         "n_test_samples_used": len(y_t),
     }
 
-    # Feature importance (use available features only)
-    if hasattr(model, "feature_importances_") and len(available_features) > 0:
-        fi = (np.array(available_features), model.feature_importances_)
-    elif model_name in ("LinearRegression",) and len(available_features) > 0:
-        coef = getattr(model, "coef_", np.zeros(len(available_features)))
-        fi = (np.array(available_features), np.abs(coef))
+    # Feature importance
+    if not no_features and hasattr(model, "feature_importances_") and len(selected) > 0:
+        fi = (np.array(selected), model.feature_importances_)
+    elif not no_features and model_name in ("LinearRegression",) and len(selected) > 0:
+        coef = getattr(model, "coef_", np.zeros(len(selected)))
+        fi = (np.array(selected), np.abs(coef))
     else:
-        fi = (np.array(available_features), np.zeros(len(available_features)))
+        fi = (np.array(selected), np.zeros(len(selected)))
 
     primary = metrics.get(metric_primary, metrics["r2"])
 
@@ -278,12 +282,11 @@ def feature_selection_eval(
         "feature_importance_from": "model",
         "model_performance": float(primary) if primary is not None else np.nan,
         "metrics": metrics,
-        "selection_time": selection_time,
-        "n_features_selected": len(available_features),  # Use actual available count
+        "selected_features": selected,
         "model_name": model_name,
+        "selected_scores": selector_scores,
+        "k": len(selected),
         "rng": pipeline_components.get("rng", None),
-        "selected_features": available_features,  # Return what was actually used
-        "selector_scores": pipeline_components.get("selector_scores", []),
         "y_pred": y_p,
         "y_true_index": y_test.index[mask_fin],
     }
