@@ -398,4 +398,29 @@ print(method_summary.round(4))
 # ## Results and Visualisation
 
 # %% [markdown]
+# ### Load data
+
+# %%
+# Load saved feature selection benchmark (feature_selection_benchmark_v1.pkl)
+import os
+import pandas as pd
+
+pkl_path = f"{path_loader.get_data_path()}data/results/{folder_name}/feature_selection_benchmark_{exp_id}.pkl"
+if not os.path.exists(pkl_path):
+    raise FileNotFoundError(f"Pickle not found: {pkl_path}")
+
+df_benchmark = pd.read_pickle(pkl_path)
+print(f"Loaded df_benchmark with shape: {df_benchmark.shape}")
+# Display first rows (works in notebook)
+try:
+    from IPython.display import display
+
+    display(df_benchmark.head())
+except Exception:
+    print(df_benchmark.head().to_string())
+
+
+# %%
+
+# %% [markdown]
 # ### Heatmaps

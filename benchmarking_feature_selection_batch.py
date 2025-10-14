@@ -39,15 +39,18 @@ def random_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
 
 def _drop_correlated_columns(X: pd.DataFrame, threshold: float = 0.95) -> List[str]:
     """Drop highly correlated columns to reduce redundancy"""
-    corr = X.corr().abs()
-    upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
-    to_drop = set()
-    for col in sorted(upper.columns):
-        if col in to_drop:
-            continue
-        high_corr = upper.index[upper[col] > threshold].tolist()
-        to_drop.update(high_corr)
-    return [c for c in X.columns if c not in to_drop]
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        corr = X.corr().abs()
+        upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
+        to_drop = set()
+        for col in sorted(upper.columns):
+            if col in to_drop:
+                continue
+            high_corr = upper.index[upper[col] > threshold].tolist()
+            to_drop.update(high_corr)
+        return [c for c in X.columns if c not in to_drop]
 
 
 def create_feature_selection_pipeline(
