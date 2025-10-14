@@ -1086,7 +1086,7 @@ def mrmr_select_fcq(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_ind
 
     return selected, successive_scores
 
-def mrmr_select_fcq_fast(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_index=True):
+def mrmr_select_fcq_fast(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_index=False):
     """
     Fast mRMR-FCQ feature selection with further optimizations
     May have minor differences from original but much faster
