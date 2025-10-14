@@ -1086,6 +1086,67 @@ def mrmr_select_fcq(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_ind
 
     return selected, successive_scores
 
+def mrmr_select_fcq_fast(X: pd.DataFrame, y: pd.Series, K: int, verbose=0, return_index=True):
+    """
+    Fast mRMR-FCQ feature selection with further optimizations
+    May have minor differences from original but much faster
+    """
+    n_features = X.shape[1]
+    feature_names = X.columns.tolist()
+    X_np = X.values
+    y_np = y.values
+    
+    # Precompute everything upfront
+    corr_matrix = np.abs(np.corrcoef(X_np, rowvar=False))
+    from sklearn.feature_selection import f_regression
+    F, _ = f_regression(X_np, y_np)
+    
+    selected = []
+    remaining = set(range(n_features))
+    successive_scores = []
+    
+    for i in range(min(K, n_features)):
+        if i == 0:
+            # Select most relevant feature
+            scores = F
+        else:
+            # Compute redundancy for each remaining feature
+            redundancy = np.zeros(n_features)
+            for feat in remaining:
+                if i == 1:
+                    redundancy[feat] = corr_matrix[feat, selected[0]]
+                else:
+                    # Use vectorized mean calculation
+                    redundancy[feat] = np.mean(corr_matrix[feat, selected])
+            
+            # FCQ score: relevance / redundancy
+            scores = np.divide(F, redundancy, 
+                             out=np.full_like(F, -np.inf), 
+                             where=redundancy>1e-8)
+        
+        # Find best among remaining features
+        best_score = -np.inf
+        best_feature = None
+        
+        for feat in remaining:
+            if scores[feat] > best_score:
+                best_score = scores[feat]
+                best_feature = feat
+        
+        if best_feature is None:
+            break
+            
+        selected.append(best_feature)
+        remaining.remove(best_feature)
+        successive_scores.append(best_score)
+        
+        if verbose:
+            print(f'Iteration {i+1}: selected {feature_names[best_feature]}, score {best_score:.4f}')
+    
+    if return_index:
+        return selected, successive_scores
+    else:
+        return [feature_names[i] for i in selected], successive_scores
 
 def enet_select(X: pd.DataFrame, y: pd.Series, k: int, **kwargs):
     enet = ElasticNet(**kwargs)

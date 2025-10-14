@@ -92,9 +92,20 @@ from sklearn.preprocessing import StandardScaler #noqa: E402
 from toolkit import FirstQuantileImputer, f_regression_select, get_model_from_string #noqa: E402
 from toolkit import (
     mrmr_select_fcq, 
-    mutual_information_select, 
+    mrmr_select_fcq_fast,
+    mutual_information_select,
+    select_random_features,
 ) #noqa: E402
 import time #noqa: E402
+
+
+# %%
+def random_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
+    """Wrapper function for random feature selection that returns dummy scores"""
+    selected_features, _ = select_random_features(X, y, k)
+    # Return dummy scores (all zeros) since random selection has no meaningful scores
+    dummy_scores = np.zeros(len(selected_features))
+    return selected_features, dummy_scores
 
 
 # %%
@@ -294,179 +305,27 @@ def feature_selection_eval(
 
 # %% [markdown]
 # ## Execution 
-
-# %% [markdown]
-# # Isolated MRMR Timing Test
-
-# %%
-import time
-import numpy as np
-import pandas as pd
-from toolkit import mrmr_select_fcq
-
-# Setup focused test parameters
-k_values_to_test = list(range(1, 11))  # k=1 to 10
-n_iterations = 5  # Reduce iterations for quick testing
-
-# Prepare data subset for faster testing
-feature_subset = feature_data.iloc[:, :5000]  # Use first 500 features for quick testing
-print(f"Testing MRMR on subset: {feature_subset.shape}")
-
-
-# %%
-def time_mrmr_selection(X, y, k_values, iterations=5):
-    """Time MRMR feature selection for different k values"""
-    timing_results = []
-
-    for k in k_values:
-        iteration_times = []
-
-        for i in range(iterations):
-            start_time = time.time()
-
-            # Pure MRMR selection without any other processing
-            selected_features, selector_scores = mrmr_select_fcq(X, y, k)
-
-            end_time = time.time()
-            selection_time = end_time - start_time
-            iteration_times.append(selection_time)
-
-            print(f"k={k}, iteration {i + 1}: {selection_time:.4f}s")
-
-        # Calculate statistics
-        mean_time = np.mean(iteration_times)
-        std_time = np.std(iteration_times)
-
-        timing_results.append(
-            {
-                "k_value": k,
-                "mean_time": mean_time,
-                "std_time": std_time,
-                "min_time": min(iteration_times),
-                "max_time": max(iteration_times),
-                "n_features_selected": len(selected_features),
-            }
-        )
-
-        print(f"k={k}: Mean time = {mean_time:.4f}s ± {std_time:.4f}s")
-
-    return pd.DataFrame(timing_results)
-
-
-# %%
-# Run MRMR timing test
-print("Starting isolated MRMR timing test...")
-mrmr_timing_df = time_mrmr_selection(
-    feature_subset, label_data, k_values_to_test, n_iterations
-)
-
-# %%
-# Display results
-print("\nMRMR Timing Results:")
-print(mrmr_timing_df.round(4))
-
-# %%
-
-# %%
-# Plot timing vs k-value
-import matplotlib.pyplot as plt
-
-plt.figure(figsize=(10, 6))
-plt.errorbar(
-    mrmr_timing_df["k_value"],
-    mrmr_timing_df["mean_time"],
-    yerr=mrmr_timing_df["std_time"],
-    fmt="o-",
-    capsize=5,
-)
-plt.title("MRMR Feature Selection Time vs Number of Features")
-plt.xlabel("Number of Features Selected (k)")
-plt.ylabel("Time (seconds)")
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.show()
-
-# %%
-# Analyze time complexity
-from scipy.optimize import curve_fit
-
-
-def quadratic_func(x, a, b, c):
-    return a * x**2 + b * x + c
-
-
-def linear_func(x, a, b):
-    return a * x + b
-
-
-# Fit different complexity models
-x_data = mrmr_timing_df["k_value"]
-y_data = mrmr_timing_df["mean_time"]
-
-try:
-    # Quadratic fit (O(n²) complexity)
-    popt_quad, _ = curve_fit(quadratic_func, x_data, y_data)
-    y_pred_quad = quadratic_func(x_data, *popt_quad)
-
-    # Linear fit (O(n) complexity)
-    popt_lin, _ = curve_fit(linear_func, x_data, y_data)
-    y_pred_lin = linear_func(x_data, *popt_lin)
-
-    # Calculate R² for both fits
-    ss_res_quad = np.sum((y_data - y_pred_quad) ** 2)
-    ss_tot_quad = np.sum((y_data - np.mean(y_data)) ** 2)
-    r2_quad = 1 - (ss_res_quad / ss_tot_quad)
-
-    ss_res_lin = np.sum((y_data - y_pred_lin) ** 2)
-    ss_tot_lin = np.sum((y_data - np.mean(y_data)) ** 2)
-    r2_lin = 1 - (ss_res_lin / ss_tot_lin)
-
-    print(f"Quadratic fit R²: {r2_quad:.4f}")
-    print(f"Linear fit R²: {r2_lin:.4f}")
-
-    # Plot fits
-    plt.figure(figsize=(10, 6))
-    plt.plot(x_data, y_data, "bo-", label="Actual Data")
-    plt.plot(x_data, y_pred_quad, "r--", label=f"Quadratic Fit (R²={r2_quad:.3f})")
-    plt.plot(x_data, y_pred_lin, "g--", label=f"Linear Fit (R²={r2_lin:.3f})")
-    plt.title("MRMR Time Complexity Analysis")
-    plt.xlabel("Number of Features Selected (k)")
-    plt.ylabel("Time (seconds)")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.show()
-
-except Exception as e:
-    print(f"Complexity analysis failed: {e}")
-
-# %%
-# Save MRMR timing results
-mrmr_timing_df.to_csv(f"{file_save_path}mrmr_timing_test_{exp_id}.csv")
-print(f"MRMR timing results saved to: {file_save_path}mrmr_timing_test_{exp_id}.csv")
-
-# %%
-
 # %%
 # Setup experiment parameters - using only the three requested methods
 feature_set_sizes = [10, 20, 40, 80, 160, 320, 640, 1280]
 models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
 
-# Define only the three feature selection methods you requested
+# Define the feature selection methods including random selection as negative control
 feature_selection_methods = {
     "anova_filter": f_regression_select,        # Renamed as ANOVA-filter
-    "mrmr": mrmr_select_fcq,                    # MRMR method [2]
-    "mutual_info": mutual_information_select    # Mutual Information method [2]
+    "mrmr": mrmr_select_fcq_fast,                    # MRMR method [2]
+    "mutual_info": mutual_information_select,   # Mutual Information method [2]
+    "random_select": random_select_wrapper      # Random selection as negative control
 }
 
 print(f"Benchmarking {len(feature_selection_methods)} methods across {len(feature_set_sizes)} feature sizes and {len(models)} models")
 print(f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}")
-print("Methods: ANOVA-filter, MRMR, and Mutual Information")
+print("Methods: ANOVA-filter, MRMR, Mutual Information, and Random Selection (negative control)")
 
 # %%
-from toolkit import Powerkit
-import numpy as np
-import time #noqa: F811
+from toolkit import Powerkit #noqa: E402
+import numpy as np #noqa: E402
+import time #noqa: F811, E402
 
 # Initialize Powerkit with proteomics data
 pk = Powerkit(feature_data, label_data)
@@ -499,7 +358,7 @@ print(f"Registered {len(pk.conditions)} conditions in {time.time() - start_time:
 
 # %%
 # Run all conditions using Powerkit's parallel processing [1]
-print("Starting feature selection benchmark (ANOVA-filter, MRMR, Mutual Information)...")
+print("Starting feature selection benchmark (ANOVA-filter, MRMR, Mutual Information, Random Selection)...")
 print(f"Running with {len(rngs)} random seeds and -1 n_jobs for maximum parallelization")
 
 benchmark_start = time.time()
@@ -530,9 +389,9 @@ print(f"Total runs: {len(df_benchmark)}")
 print(f"Unique conditions: {df_benchmark['condition'].nunique()}")
 print(f"Performance range (R²): {df_benchmark['model_performance'].min():.4f} to {df_benchmark['model_performance'].max():.4f}")
 
-# Show performance by method (using the three requested methods)
+# Show performance by method (including random selection as negative control)
 method_summary = df_benchmark.groupby("method")["model_performance"].agg(["mean", "std", "count"])
-print("\nPerformance by method (ANOVA-filter, MRMR, Mutual Information):")
+print("\nPerformance by method (ANOVA-filter, MRMR, Mutual Information, Random Selection):")
 print(method_summary.round(4))
 
 # %% [markdown]
