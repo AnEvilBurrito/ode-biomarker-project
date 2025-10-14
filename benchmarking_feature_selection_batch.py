@@ -74,15 +74,19 @@ def create_feature_selection_pipeline(
         corr_keep_cols = _drop_correlated_columns(Xtr, threshold=0.95)
         Xtr_filtered = Xtr[corr_keep_cols]
 
-        # 4) Feature selection
+        # 4) Feature selection with timing measurement
         k_sel = min(k, Xtr_filtered.shape[1]) if Xtr_filtered.shape[1] > 0 else 0
         if k_sel == 0:
             selected_features, selector_scores = [], np.array([])
             no_features = True
+            feature_selection_time = 0.0
         else:
+            # Measure feature selection time
+            feature_selection_start = time.time()
             selected_features, selector_scores = selection_method(
                 Xtr_filtered, y_train, k_sel
             )
+            feature_selection_time = time.time() - feature_selection_start
             no_features = False
 
         # 5) Standardization and model training
@@ -128,6 +132,7 @@ def create_feature_selection_pipeline(
             "scaler": scaler if not no_features else None,
             "no_features": no_features,
             "rng": rng,
+            "feature_selection_time": feature_selection_time,
         }
 
     return pipeline_function
@@ -151,6 +156,7 @@ def feature_selection_eval(
     model_name = pipeline_components["model_type"]
     scaler = pipeline_components.get("scaler", None)
     no_features = pipeline_components.get("no_features", False)
+    feature_selection_time = pipeline_components.get("feature_selection_time", 0.0)
 
     # Apply identical transforms as training
     X_test = X_test.replace([np.inf, -np.inf], np.nan)
@@ -228,20 +234,19 @@ def feature_selection_eval(
         "rng": pipeline_components.get("rng", None),
         "y_pred": y_p,
         "y_true_index": y_test.index[mask_fin],
+        "feature_selection_time": feature_selection_time,
     }
 
 
 def main():
     """Main execution function for feature selection benchmarking"""
-    print("Starting feature selection benchmarking batch script...")
-    
     # Initialize path loader and data link
     path_loader = PathLoader("data_config.env", "current_user.env")
     data_link = DataLink(path_loader, "data_codes.csv")
     
     # Setup experiment parameters
     folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-    exp_id = "v1"
+    exp_id = "v3"
     
     # Create results directory
     if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}"):
@@ -249,110 +254,150 @@ def main():
     
     file_save_path = f"{path_loader.get_data_path()}data/results/{folder_name}/"
     
-    print(f"Results will be saved to: {file_save_path}")
+    # Create report file
+    report_file = f"{file_save_path}feature_selection_benchmark_report_{exp_id}.md"
     
-    # Load Proteomics Palbociclib dataset
-    print("Loading proteomics data...")
-    loading_code = "goncalves-gdsc-2-Palbociclib-LN_IC50-sin"
-    proteomic_feature_data, proteomic_label_data = data_link.get_data_using_code(loading_code)
+    def print_and_save(message, file_handle):
+        print(message)
+        file_handle.write(message + "\n")
     
-    print(f"Proteomic feature data shape: {proteomic_feature_data.shape}")
-    print(f"Proteomic label data shape: {proteomic_label_data.shape}")
+    with open(report_file, 'w', encoding='utf-8') as report:
+        print_and_save("# Feature Selection Benchmarking Report", report)
+        print_and_save(f"**Generated on:** {time.strftime('%Y-%m-%d %H:%M:%S')}", report)
+        print_and_save(f"**Experiment ID:** {exp_id}", report)
+        print_and_save("", report)
+        
+        print_and_save("## Execution Summary", report)
+        print_and_save("Starting feature selection benchmarking batch script...", report)
+        print_and_save(f"Results will be saved to: {file_save_path}", report)
     
-    # Data preparation and alignment
-    print("Preparing and aligning data...")
-    proteomic_feature_data = proteomic_feature_data.select_dtypes(include=[np.number])
-    
-    # Align indices
-    common_indices = sorted(
-        set(proteomic_feature_data.index) & set(proteomic_label_data.index)
-    )
-    feature_data = proteomic_feature_data.loc[common_indices]
-    label_data = proteomic_label_data.loc[common_indices]
-    
-    print(f"Final aligned dataset shape: {feature_data.shape}")
-    print(f"Final aligned label shape: {label_data.shape}")
-    
-    # Setup experiment parameters
-    feature_set_sizes = [10, 20, 40, 80, 160, 320, 640, 1280]
-    models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
-    
-    # Define the feature selection methods including random selection as negative control
-    feature_selection_methods = {
-        "anova_filter": f_regression_select,        # Renamed as ANOVA-filter
-        "mrmr": mrmr_select_fcq_fast,              # MRMR method
-        "mutual_info": mutual_information_select,  # Mutual Information method
-        "random_select": random_select_wrapper     # Random selection as negative control
-    }
-    
-    print(f"Benchmarking {len(feature_selection_methods)} methods across {len(feature_set_sizes)} feature sizes and {len(models)} models")
-    print(f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}")
-    print("Methods: ANOVA-filter, MRMR, Mutual Information, and Random Selection (negative control)")
-    
-    # Initialize Powerkit with proteomics data
-    pk = Powerkit(feature_data, label_data)
-    
-    # Register all conditions (method × size × model combinations)
-    rngs = np.random.RandomState(42).randint(0, 100000, size=1)  # Single run for batch execution
-    
-    start_time = time.time()
-    
-    for method_name, selection_method in feature_selection_methods.items():
-        for k in feature_set_sizes:
-            for model_name in models:
-                # Create condition name using the requested naming convention
-                condition = f"{method_name}_k{k}_{model_name}"
-                
-                # Create pipeline for this method and size
-                pipeline_func = create_feature_selection_pipeline(selection_method, k, method_name, model_name)
-                
-                # Add condition to Powerkit
-                pk.add_condition(
-                    condition=condition,
-                    get_importance=True,
-                    pipeline_function=pipeline_func,
-                    pipeline_args={},
-                    eval_function=feature_selection_eval,
-                    eval_args={"metric_primary": "r2"}
-                )
-    
-    print(f"Registered {len(pk.conditions)} conditions in {time.time() - start_time:.2f} seconds")
-    
-    # Run all conditions using Powerkit's parallel processing
-    print("Starting feature selection benchmark...")
-    print(f"Running with {len(rngs)} random seeds and -1 n_jobs for maximum parallelization")
-    
-    benchmark_start = time.time()
-    df_benchmark = pk.run_all_conditions(rng_list=rngs, n_jobs=-1, verbose=True)
-    benchmark_time = time.time() - benchmark_start
-    
-    print(f"Benchmark completed in {benchmark_time:.2f} seconds")
-    print(f"Results shape: {df_benchmark.shape}")
-    
-    # Extract k value and model name from condition for easier analysis
-    df_benchmark["k_value"] = df_benchmark["condition"].str.extract(r'k(\d+)').astype(int)
-    df_benchmark["method"] = df_benchmark["condition"].str.split('_').str[0]
-    df_benchmark["model_name"] = df_benchmark["condition"].str.split('_').str[2]
-    
-    print("Condition breakdown:")
-    print(df_benchmark[["condition", "method", "k_value", "model_name"]].head(10))
-    
-    # Save results
-    df_benchmark.to_pickle(f"{file_save_path}feature_selection_benchmark_{exp_id}.pkl")
-    print(f"Results saved to: {file_save_path}feature_selection_benchmark_{exp_id}.pkl")
-    
-    # Quick summary of results
-    print("\nBenchmark Summary:")
-    print(f"Total runs: {len(df_benchmark)}")
-    print(f"Unique conditions: {df_benchmark['condition'].nunique()}")
-    print(f"Performance range (R²): {df_benchmark['model_performance'].min():.4f} to {df_benchmark['model_performance'].max():.4f}")
-    
-    # Show performance by method (including random selection as negative control)
-    method_summary = df_benchmark.groupby("method")["model_performance"].agg(["mean", "std", "count"])
-    print("\nPerformance by method (ANOVA-filter, MRMR, Mutual Information, Random Selection):")
-    print(method_summary.round(4))
-    
-    print("\nFeature selection benchmarking completed successfully!")
+    with open(report_file, 'a', encoding='utf-8') as report:
+        print_and_save("## Data Loading and Preparation", report)
+        print_and_save("Loading proteomics data...", report)
+        loading_code = "goncalves-gdsc-2-Palbociclib-LN_IC50-sin"
+        proteomic_feature_data, proteomic_label_data = data_link.get_data_using_code(loading_code)
+        
+        print_and_save(f"Proteomic feature data shape: {proteomic_feature_data.shape}", report)
+        print_and_save(f"Proteomic label data shape: {proteomic_label_data.shape}", report)
+        
+        print_and_save("Preparing and aligning data...", report)
+        proteomic_feature_data = proteomic_feature_data.select_dtypes(include=[np.number])
+        
+        # Align indices
+        common_indices = sorted(
+            set(proteomic_feature_data.index) & set(proteomic_label_data.index)
+        )
+        feature_data = proteomic_feature_data.loc[common_indices]
+        label_data = proteomic_label_data.loc[common_indices]
+        
+        print_and_save(f"Final aligned dataset shape: {feature_data.shape}", report)
+        print_and_save(f"Final aligned label shape: {label_data.shape}", report)
+        
+        print_and_save("## Experiment Setup", report)
+        # Setup experiment parameters
+        feature_set_sizes = [10, 20, 30, 40, 60, 80, 160]
+        models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
+        
+        # Define the feature selection methods including random selection as negative control
+        feature_selection_methods = {
+            "anova_filter": f_regression_select,        # Renamed as ANOVA-filter
+            "mrmr": mrmr_select_fcq_fast,              # MRMR method
+            "mutual_info": mutual_information_select,  # Mutual Information method
+            "random_select": random_select_wrapper     # Random selection as negative control
+        }
+        
+        print_and_save(f"Benchmarking {len(feature_selection_methods)} methods across {len(feature_set_sizes)} feature sizes and {len(models)} models", report)
+        print_and_save(f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}", report)
+        print_and_save("Methods: ANOVA-filter, MRMR, Mutual Information, and Random Selection (negative control)", report)
+        
+        print_and_save("## Powerkit Setup", report)
+        # Initialize Powerkit with proteomics data
+        pk = Powerkit(feature_data, label_data)
+        
+        # Register all conditions (method × size × model combinations)
+        rngs = np.random.RandomState(42).randint(0, 100000, size=1)  # Single run for batch execution
+        
+        start_time = time.time()
+        
+        for method_name, selection_method in feature_selection_methods.items():
+            for k in feature_set_sizes:
+                for model_name in models:
+                    # Create condition name using the requested naming convention
+                    condition = f"{method_name}_k{k}_{model_name}"
+                    
+                    # Create pipeline for this method and size
+                    pipeline_func = create_feature_selection_pipeline(selection_method, k, method_name, model_name)
+                    
+                    # Add condition to Powerkit
+                    pk.add_condition(
+                        condition=condition,
+                        get_importance=True,
+                        pipeline_function=pipeline_func,
+                        pipeline_args={},
+                        eval_function=feature_selection_eval,
+                        eval_args={"metric_primary": "r2"}
+                    )
+        
+        print_and_save(f"Registered {len(pk.conditions)} conditions in {time.time() - start_time:.2f} seconds", report)
+        
+        print_and_save("## Benchmark Execution", report)
+        # Run all conditions using Powerkit's parallel processing
+        print_and_save("Starting feature selection benchmark...", report)
+        print_and_save(f"Running with {len(rngs)} random seeds and -1 n_jobs for maximum parallelization", report)
+        
+        benchmark_start = time.time()
+        df_benchmark = pk.run_all_conditions(rng_list=rngs, n_jobs=-1, verbose=True)
+        benchmark_time = time.time() - benchmark_start
+        
+        print_and_save(f"Benchmark completed in {benchmark_time:.2f} seconds", report)
+        print_and_save(f"Results shape: {df_benchmark.shape}", report)
+        
+        # Extract k value and model name from condition for easier analysis
+        df_benchmark["k_value"] = df_benchmark["condition"].str.extract(r'k(\d+)').astype(int)
+        df_benchmark["method"] = df_benchmark["condition"].str.split('_').str[0]
+        df_benchmark["model_name"] = df_benchmark["condition"].str.split('_').str[2]
+        
+        print_and_save("## Results", report)
+        print_and_save("### Condition Breakdown", report)
+        print_and_save("Condition breakdown:", report)
+        print_and_save(df_benchmark[["condition", "method", "k_value", "model_name"]].head(10).to_string(), report)
+        
+        # Save results
+        df_benchmark.to_pickle(f"{file_save_path}feature_selection_benchmark_{exp_id}.pkl")
+        print_and_save(f"Results saved to: {file_save_path}feature_selection_benchmark_{exp_id}.pkl", report)
+        
+        print_and_save("### Performance Summary", report)
+        print_and_save("Benchmark Summary:", report)
+        print_and_save(f"Total runs: {len(df_benchmark)}", report)
+        print_and_save(f"Unique conditions: {df_benchmark['condition'].nunique()}", report)
+        print_and_save(f"Performance range (R²): {df_benchmark['model_performance'].min():.4f} to {df_benchmark['model_performance'].max():.4f}", report)
+
+        # Show performance by method (including random selection as negative control)
+        method_summary = df_benchmark.groupby("method")["model_performance"].agg(["mean", "std", "count"])
+        print_and_save("\nPerformance by method (ANOVA-filter, MRMR, Mutual Information, Random Selection):", report)
+        print_and_save(method_summary.round(4).to_string(), report)
+
+        print_and_save("### Feature Selection Time Analysis", report)
+        print_and_save("Feature Selection Time Analysis:", report)
+        print_and_save(f"Feature selection time range: {df_benchmark['feature_selection_time'].min():.6f} to {df_benchmark['feature_selection_time'].max():.6f} seconds", report)
+        
+        # Time analysis by method
+        time_summary = df_benchmark.groupby("method")["feature_selection_time"].agg(["mean", "std", "count"])
+        print_and_save("\nFeature Selection Time by Method:", report)
+        print_and_save(time_summary.round(6).to_string(), report)
+        
+        # Time analysis by k value
+        k_time_summary = df_benchmark.groupby("k_value")["feature_selection_time"].agg(["mean", "std", "count"])
+        print_and_save("\nFeature Selection Time by k Value:", report)
+        print_and_save(k_time_summary.round(6).to_string(), report)
+        
+        # Time vs. performance correlation
+        time_perf_corr = df_benchmark["feature_selection_time"].corr(df_benchmark["model_performance"])
+        print_and_save(f"\nCorrelation between feature selection time and performance (R²): {time_perf_corr:.4f}", report)
+
+        print_and_save("## Conclusion", report)
+        print_and_save("Feature selection benchmarking completed successfully!", report)
+        print_and_save(f"Report saved to: {report_file}", report)
 
 
 if __name__ == "__main__":

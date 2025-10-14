@@ -421,6 +421,355 @@ except Exception:
 
 
 # %%
+# Basic stats
+
 
 # %% [markdown]
-# ### Heatmaps
+# ### Performance Comparison: Feature Selection Methods
+
+# %%
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Set up plotting style
+plt.style.use('seaborn-v0_8')
+sns.set_palette("husl")
+
+# Method labels for better visualization
+method_labels = {
+    'anova_filter': 'ANOVA-Filter',
+    'mrmr': 'MRMR', 
+    'mutual_info': 'Mutual Information',
+    'random_select': 'Random Selection'
+}
+
+# Create publication-quality box plot comparing methods across all feature sizes and models
+plt.figure(figsize=(10, 6), dpi=300)
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+
+sns.boxplot(data=df_benchmark, x='method', y='model_performance', 
+            order=['anova_filter', 'mrmr', 'mutual_info', 'random_select'],
+            palette=colors, width=0.6, fliersize=3)
+plt.title('Feature Selection Method Performance Comparison', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Feature Selection Method', fontsize=14, fontweight='bold')
+plt.ylabel('R² Score', fontsize=14, fontweight='bold')
+plt.xticks(ticks=range(4), 
+           labels=[method_labels[m] for m in ['anova_filter', 'mrmr', 'mutual_info', 'random_select']],
+           rotation=45, fontsize=12)
+plt.yticks(fontsize=12)
+plt.grid(axis='y', alpha=0.2, linestyle='--')
+plt.tight_layout()
+plt.savefig(f"{file_save_path}method_comparison_boxplot.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Calculate mean and standard deviation for each method
+method_stats = df_benchmark.groupby('method')['model_performance'].agg(['mean', 'std', 'count']).reset_index()
+
+# Create publication-quality bar plot with error bars
+plt.figure(figsize=(10, 6), dpi=300)
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+
+# Create bar plot with error bars
+bars = plt.bar(range(len(method_stats)), method_stats['mean'], 
+               yerr=method_stats['std'], capsize=8, alpha=0.8,
+               color=colors, edgecolor='black', linewidth=1)
+
+plt.title('Mean Performance of Feature Selection Methods', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Feature Selection Method', fontsize=14, fontweight='bold')
+plt.ylabel('Mean R² Score ± Std. Dev.', fontsize=14, fontweight='bold')
+plt.xticks(ticks=range(len(method_stats)), 
+           labels=[method_labels.get(m, m) for m in method_stats['method']],
+           rotation=45, fontsize=12)
+plt.yticks(fontsize=12)
+
+# Add value labels on bars with improved formatting
+for i, bar in enumerate(bars):
+    height = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+             f'{height:.3f} ± {method_stats.iloc[i]["std"]:.3f}',
+             ha='center', va='bottom', fontsize=11, fontweight='bold')
+
+plt.grid(axis='y', alpha=0.2, linestyle='--')
+plt.tight_layout()
+plt.savefig(f"{file_save_path}method_performance_bar.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Create publication-quality faceted box plots by model type
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+
+g = sns.catplot(data=df_benchmark, x='method', y='model_performance', 
+                col='model_name', kind='box', height=6, aspect=1.2,
+                order=['anova_filter', 'mrmr', 'mutual_info', 'random_select'],
+                palette=colors, width=0.6, fliersize=3)
+g.set_titles("Model: {col_name}", fontsize=14, fontweight='bold')
+g.set_axis_labels("Feature Selection Method", "R² Score", fontsize=12, fontweight='bold')
+g.fig.suptitle('Feature Selection Performance by ML Model', y=1.02, fontsize=16, fontweight='bold')
+
+# Customize the plot appearance
+for ax in g.axes.flat:
+    ax.tick_params(axis='x', rotation=45, labelsize=10)
+    ax.tick_params(axis='y', labelsize=10)
+    ax.grid(True, alpha=0.2, linestyle='--')
+
+plt.tight_layout()
+plt.savefig(f"{file_save_path}performance_by_model_boxplot.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Create comprehensive statistical summary
+summary_table = df_benchmark.groupby('method')['model_performance'].agg([
+    ('count', 'count'),
+    ('mean', 'mean'),
+    ('std', 'std'),
+    ('min', 'min'),
+    ('25%', lambda x: x.quantile(0.25)),
+    ('median', 'median'),
+    ('75%', lambda x: x.quantile(0.75)),
+    ('max', 'max')
+]).round(4)
+
+print("Performance Statistics by Feature Selection Method:")
+print(summary_table)
+
+# %% [markdown]
+# ### Performance vs. Feature Set Size (k value)
+
+# %%
+# Derive feature_set_sizes from the dataframe to handle different runs
+feature_set_sizes_viz = sorted(df_benchmark['k_value'].unique())
+
+# Calculate mean and standard deviation for each method and k value
+k_performance_stats = df_benchmark.groupby(['method', 'k_value'])['model_performance'].agg(['mean', 'std', 'count']).reset_index()
+
+# Create publication-quality line plot with standard deviation bands
+plt.figure(figsize=(10, 6), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+markers = ['o', 's', '^', 'D']  # Circle, Square, Triangle, Diamond
+
+# Plot each method with error bands
+for i, method in enumerate(k_performance_stats['method'].unique()):
+    method_data = k_performance_stats[k_performance_stats['method'] == method]
+    
+    # Sort by k_value to ensure proper line plotting
+    method_data = method_data.sort_values('k_value')
+    
+    # Plot the mean line
+    plt.plot(method_data['k_value'], method_data['mean'], 
+             marker=markers[i], linewidth=2.5, markersize=8, 
+             color=colors[i], markeredgecolor='white', markeredgewidth=1,
+             label=method_labels.get(method, method))
+    
+    # Add standard deviation bands (shaded area)
+    plt.fill_between(method_data['k_value'], 
+                     method_data['mean'] - method_data['std'],
+                     method_data['mean'] + method_data['std'],
+                     alpha=0.15, color=colors[i])
+
+plt.title('Feature Selection Performance vs. Number of Features Selected', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+plt.ylabel('Mean R² Score ± Std. Dev.', fontsize=14, fontweight='bold')
+plt.xscale('log')  # Use log scale for better visualization of wide k range
+plt.xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=12)
+plt.yticks(fontsize=12)
+plt.grid(True, alpha=0.2, linestyle='--')
+plt.legend(title='Feature Selection Method', fontsize=11, framealpha=0.9)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}performance_vs_k_value.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Create publication-quality faceted line plots by model type
+plt.figure(figsize=(18, 6), dpi=300)
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Calculate stats by method, k_value, and model_name
+model_k_stats = df_benchmark.groupby(['method', 'k_value', 'model_name'])['model_performance'].agg(['mean', 'std']).reset_index()
+
+# Create subplots for each model
+models = ['KNeighborsRegressor', 'LinearRegression', 'SVR']
+fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+# Define publication-quality color palette and markers
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+markers = ['o', 's', '^', 'D']  # Circle, Square, Triangle, Diamond
+
+for i, model in enumerate(models):
+    model_data = model_k_stats[model_k_stats['model_name'] == model]
+    
+    for j, method in enumerate(model_data['method'].unique()):
+        method_model_data = model_data[model_data['method'] == method].sort_values('k_value')
+        
+        axes[i].plot(method_model_data['k_value'], method_model_data['mean'], 
+                     marker=markers[j], linewidth=2.5, markersize=6,
+                     color=colors[j], markeredgecolor='white', markeredgewidth=1,
+                     label=method_labels.get(method, method))
+        
+        axes[i].fill_between(method_model_data['k_value'],
+                            method_model_data['mean'] - method_model_data['std'],
+                            method_model_data['mean'] + method_model_data['std'],
+                            alpha=0.15, color=colors[j])
+    
+    axes[i].set_title(f'{model}', fontsize=14, fontweight='bold')
+    axes[i].set_xlabel('Number of Features Selected (k)', fontsize=12, fontweight='bold')
+    axes[i].set_ylabel('Mean R² Score', fontsize=12, fontweight='bold')
+    axes[i].set_xscale('log')
+    axes[i].set_xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=10)
+    axes[i].tick_params(axis='y', labelsize=10)
+    axes[i].grid(True, alpha=0.2, linestyle='--')
+    axes[i].legend(fontsize=10, framealpha=0.9)
+
+plt.suptitle('Feature Selection Performance vs. k Value by ML Model', 
+             fontsize=16, fontweight='bold', y=1.02)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}performance_vs_k_by_model.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Statistical analysis of k value effect
+print("Performance Trend Analysis by k Value:")
+for method in df_benchmark['method'].unique():
+    method_data = df_benchmark[df_benchmark['method'] == method]
+    
+    # Calculate correlation between k_value and performance
+    correlation = method_data['k_value'].corr(method_data['model_performance'])
+    
+    # Calculate performance change from smallest to largest k
+    k_min_perf = method_data[method_data['k_value'] == 10]['model_performance'].mean()
+    k_max_perf = method_data[method_data['k_value'] == 1280]['model_performance'].mean()
+    performance_change = k_max_perf - k_min_perf
+    
+    print(f"\n{method_labels.get(method, method)}:")
+    print(f"  Correlation (k vs performance): {correlation:.4f}")
+    print(f"  Performance change (k=10 to k=1280): {performance_change:.4f}")
+    print(f"  Optimal k range: {method_data.groupby('k_value')['model_performance'].mean().idxmax()} features")
+
+# %% [markdown]
+# ### Performance vs. Feature Set Size (k value) - Excluding Specific k Values
+
+# %%
+# Create visualization excluding specific k values (e.g., k=500)
+k_values_to_exclude = [500]  # Add any k values you want to exclude here
+
+# Filter dataframe to exclude specific k values
+df_filtered = df_benchmark[~df_benchmark['k_value'].isin(k_values_to_exclude)]
+
+# Derive feature_set_sizes from the filtered dataframe
+feature_set_sizes_filtered = sorted(df_filtered['k_value'].unique())
+
+# Calculate mean and standard deviation for each method and k value
+k_performance_stats_filtered = df_filtered.groupby(['method', 'k_value'])['model_performance'].agg(['mean', 'std', 'count']).reset_index()
+
+# Create publication-quality line plot with standard deviation bands (excluding specific k values)
+plt.figure(figsize=(10, 6), dpi=300)
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+markers = ['o', 's', '^', 'D']  # Circle, Square, Triangle, Diamond
+
+# Plot each method with error bands
+for i, method in enumerate(k_performance_stats_filtered['method'].unique()):
+    method_data = k_performance_stats_filtered[k_performance_stats_filtered['method'] == method]
+    
+    # Sort by k_value to ensure proper line plotting
+    method_data = method_data.sort_values('k_value')
+    
+    # Plot the mean line
+    plt.plot(method_data['k_value'], method_data['mean'], 
+             marker=markers[i], linewidth=2.5, markersize=8, 
+             color=colors[i], markeredgecolor='white', markeredgewidth=1,
+             label=method_labels.get(method, method))
+    
+    # Add standard deviation bands (shaded area)
+    plt.fill_between(method_data['k_value'], 
+                     method_data['mean'] - method_data['std'],
+                     method_data['mean'] + method_data['std'],
+                     alpha=0.15, color=colors[i])
+
+plt.title(f'Feature Selection Performance vs. Number of Features Selected\n(Excluding k={k_values_to_exclude})', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+plt.ylabel('Mean R² Score ± Std. Dev.', fontsize=14, fontweight='bold')
+plt.xscale('log')  # Use log scale for better visualization of wide k range
+plt.xticks(feature_set_sizes_filtered, feature_set_sizes_filtered, fontsize=12)
+plt.yticks(fontsize=12)
+plt.grid(True, alpha=0.2, linestyle='--')
+plt.legend(title='Feature Selection Method', fontsize=11, framealpha=0.9)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}performance_vs_k_value_excluding_{'_'.join(map(str, k_values_to_exclude))}.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+print(f"Created visualization excluding k values: {k_values_to_exclude}")
+print(f"Remaining k values in visualization: {feature_set_sizes_filtered}")
+
+# %% [markdown]
+# ### Performance vs. Feature Set Size (k value) - Without Standard Error Bars
+
+# %%
+# Create line plot without standard error bars (cleaner visualization)
+plt.figure(figsize=(10, 6), dpi=300)
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+markers = ['o', 's', '^', 'D']  # Circle, Square, Triangle, Diamond
+
+# Plot each method without error bands
+for i, method in enumerate(k_performance_stats_filtered["method"].unique()):
+    method_data = k_performance_stats_filtered[k_performance_stats_filtered["method"] == method]
+    
+    # Sort by k_value to ensure proper line plotting
+    method_data = method_data.sort_values('k_value')
+    
+    # Plot the mean line only (no error bands)
+    plt.plot(method_data['k_value'], method_data['mean'], 
+             marker=markers[i], linewidth=2.5, markersize=8, 
+             color=colors[i], markeredgecolor='white', markeredgewidth=1,
+             label=method_labels.get(method, method))
+
+plt.title('Feature Selection Performance vs. Number of Features Selected', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+plt.ylabel('Mean R² Score', fontsize=14, fontweight='bold')
+plt.xscale('log')  # Use log scale for better visualization of wide k range
+plt.xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=14)
+plt.yticks(fontsize=14)
+plt.xlim(left=9, right=170)
+plt.grid(True, alpha=0.2, linestyle='--')
+plt.legend(title='Feature Selection Method', fontsize=14, framealpha=0.9)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}performance_vs_k_value_no_error_bars.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+print("Created line plot without standard error bars")
