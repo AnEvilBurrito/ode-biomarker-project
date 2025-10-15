@@ -317,7 +317,7 @@ print(f"Final aligned label shape: {label_data.shape}")
 # Setup test parameters
 k_values_to_test = list(range(1, 21))  # k=1 to 20
 n_iterations = 3  # Fewer iterations due to GFFS computational intensity
-feature_subset_size = 100  # Use first 100 features for faster testing
+feature_subset_size = 500  # Use first 100 features for faster testing
 
 # %%
 # Run the GFFS timing test
@@ -528,7 +528,7 @@ print("="*60)
 
 # Test with very small k values and feature set
 k_values_comparison = [5, 10]  # Small k values only
-feature_subset_comparison = 50  # Very small feature set
+feature_subset_comparison = 500  # Very small feature set
 
 print(f"Running method comparison with {feature_subset_comparison} features")
 print(f"Testing k values: {k_values_comparison}")

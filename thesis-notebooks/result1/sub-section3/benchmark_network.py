@@ -20,13 +20,20 @@ from sklearn.preprocessing import StandardScaler
 from PathLoader import PathLoader
 from DataLink import DataLink
 from toolkit import (
-    FirstQuantileImputer, 
-    f_regression_select, 
+    FirstQuantileImputer,
+    f_regression_select,
     get_model_from_string,
     mrmr_select_fcq_fast,
     select_network_features,
     select_random_features,
-    Powerkit
+    Powerkit,
+)
+
+# Import protein ID mapper
+from protein_id_mapper import (
+    load_protein_mapping,
+    map_network_features,
+    filter_available_features,
 )
 
 
@@ -38,8 +45,13 @@ def random_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
     return selected_features, dummy_scores
 
 
-def mrmr_network_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int, 
-                               nth_degree_neighbours: list, max_distance: int) -> tuple:
+def mrmr_network_select_wrapper(
+    X: pd.DataFrame,
+    y: pd.Series,
+    k: int,
+    nth_degree_neighbours: list,
+    max_distance: int,
+) -> tuple:
     """
     Joint MRMR + Network feature selection wrapper
     First selects network features, then applies MRMR to select k from network subset
@@ -47,30 +59,67 @@ def mrmr_network_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int,
     # Step 1: Get network features within specified distance
     # nth_degree_neighbours is a list where index 0 = distance 1, index 1 = distance 2, etc.
     if max_distance <= len(nth_degree_neighbours):
-        network_features = nth_degree_neighbours[max_distance - 1] if nth_degree_neighbours[max_distance - 1] is not None else []
+        network_features = (
+            nth_degree_neighbours[max_distance - 1]
+            if nth_degree_neighbours[max_distance - 1] is not None
+            else []
+        )
     else:
         network_features = []
-    
+
     # If no network features available, return empty selection
     if len(network_features) == 0:
         return [], np.array([])
-    
+
+    # Step 1.5: Map network protein IDs to proteomics-compatible IDs
+    # Load the protein mapping
+    path_loader = PathLoader("data_config.env", "current_user.env")
+    mapping_df = load_protein_mapping(path_loader)
+
+    if mapping_df is not None:
+        # Map network features to proteomics-compatible IDs
+        mapped_network_features = map_network_features(network_features, mapping_df)
+
+        # Filter to only include features that exist in the proteomics data
+        available_network_features = filter_available_features(
+            mapped_network_features, X.columns
+        )
+
+        print(
+            f"Network feature mapping: {len(network_features)} -> {len(available_network_features)} available features"
+        )
+
+        # Use the available mapped features
+        network_features = available_network_features
+    else:
+        # If no mapping available, try to filter network features that exist in X
+        available_network_features = [f for f in network_features if f in X.columns]
+        network_features = available_network_features
+        print(
+            f"No mapping file found. Using direct matching: {len(network_features)} -> {len(available_network_features)} available features"
+        )
+
+    # If no mapped network features available, return empty selection
+    if len(network_features) == 0:
+        return [], np.array([])
+
     # Step 2: Apply MRMR to select k features from network subset
     # Cap k at available network features
     k_actual = min(k, len(network_features))
-    
+
     # Get the network subset of features
     X_network = X[network_features]
-    
+
     # Apply MRMR to network subset
     selected_features, scores = mrmr_select_fcq_fast(X_network, y, k_actual, verbose=0)
-    
+
     return selected_features, scores
 
 
 def _drop_correlated_columns(X: pd.DataFrame, threshold: float = 0.95) -> List[str]:
     """Drop highly correlated columns to reduce redundancy"""
     import warnings
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         corr = X.corr().abs()
@@ -121,6 +170,8 @@ def create_feature_selection_pipeline(
             no_features = False
 
         # 5) Standardization and model training
+        scaler = None  # Initialize scaler to None
+
         if no_features or len(selected_features) == 0:
             model = DummyRegressor(strategy="mean")
             model_type = "DummyRegressor(mean)"
@@ -160,7 +211,7 @@ def create_feature_selection_pipeline(
             "model": model,
             "model_type": model_type,
             "model_params": model_params,
-            "scaler": scaler if not no_features else None,
+            "scaler": scaler,  # scaler is now properly initialized
             "no_features": no_features,
             "rng": rng,
             "feature_selection_time": feature_selection_time,
@@ -274,118 +325,162 @@ def main():
     # Initialize path loader and data link
     path_loader = PathLoader("data_config.env", "current_user.env")
     data_link = DataLink(path_loader, "data_codes.csv")
-    
+
     # Setup experiment parameters
     folder_name = "ThesisResult4-FeatureSelectionBenchmark"
     exp_id = "v5_network_integration"
-    
+
     # Create results directory
     if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}"):
         os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}")
-    
+
     file_save_path = f"{path_loader.get_data_path()}data/results/{folder_name}/"
-    
+
     # Create report file
     report_file = f"{file_save_path}feature_selection_benchmark_report_{exp_id}.md"
-    
+
     def print_and_save(message, file_handle):
         print(message)
         file_handle.write(message + "\n")
-    
-    with open(report_file, 'w', encoding='utf-8') as report:
-        print_and_save("# Feature Selection Benchmarking Report (Network Integration)", report)
-        print_and_save(f"**Generated on:** {time.strftime('%Y-%m-%d %H:%M:%S')}", report)
+
+    with open(report_file, "w", encoding="utf-8") as report:
+        print_and_save(
+            "# Feature Selection Benchmarking Report (Network Integration)", report
+        )
+        print_and_save(
+            f"**Generated on:** {time.strftime('%Y-%m-%d %H:%M:%S')}", report
+        )
         print_and_save(f"**Experiment ID:** {exp_id}", report)
         print_and_save("", report)
-        
+
         print_and_save("## Execution Summary", report)
-        print_and_save("Starting feature selection benchmarking with network integration...", report)
+        print_and_save(
+            "Starting feature selection benchmarking with network integration...",
+            report,
+        )
         print_and_save(f"Results will be saved to: {file_save_path}", report)
-    
-    with open(report_file, 'a', encoding='utf-8') as report:
+
+    with open(report_file, "a", encoding="utf-8") as report:
         print_and_save("## Data Loading and Preparation", report)
         print_and_save("Loading proteomics data...", report)
         loading_code = "goncalves-gdsc-2-Palbociclib-LN_IC50-sin"
-        proteomic_feature_data, proteomic_label_data = data_link.get_data_using_code(loading_code)
-        
-        print_and_save(f"Proteomic feature data shape: {proteomic_feature_data.shape}", report)
-        print_and_save(f"Proteomic label data shape: {proteomic_label_data.shape}", report)
-        
+        proteomic_feature_data, proteomic_label_data = data_link.get_data_using_code(
+            loading_code
+        )
+
+        print_and_save(
+            f"Proteomic feature data shape: {proteomic_feature_data.shape}", report
+        )
+        print_and_save(
+            f"Proteomic label data shape: {proteomic_label_data.shape}", report
+        )
+
         print_and_save("Preparing and aligning data...", report)
-        proteomic_feature_data = proteomic_feature_data.select_dtypes(include=[np.number])
-        
+        proteomic_feature_data = proteomic_feature_data.select_dtypes(
+            include=[np.number]
+        )
+
         # Align indices
         common_indices = sorted(
             set(proteomic_feature_data.index) & set(proteomic_label_data.index)
         )
         feature_data = proteomic_feature_data.loc[common_indices]
         label_data = proteomic_label_data.loc[common_indices]
-        
+
         print_and_save(f"Final aligned dataset shape: {feature_data.shape}", report)
         print_and_save(f"Final aligned label shape: {label_data.shape}", report)
-        
+
         print_and_save("## Network Structure Loading", report)
         # Load network structure
         network_file_path = f"{path_loader.get_data_path()}data/protein-interaction/STRING/palbociclib_nth_degree_neighbours.pkl"
         print_and_save(f"Loading network structure from: {network_file_path}", report)
-        
-        with open(network_file_path, 'rb') as f:
+
+        with open(network_file_path, "rb") as f:
             nth_degree_neighbours = pickle.load(f)
-        
-        print_and_save(f"Network structure loaded. Available distances: {list(range(1, len(nth_degree_neighbours) + 1))}", report)
+
+        print_and_save(
+            f"Network structure loaded. Available distances: {list(range(1, len(nth_degree_neighbours) + 1))}",
+            report,
+        )
         # Print the size of each distance
         for distance in range(1, len(nth_degree_neighbours) + 1):
             if distance <= len(nth_degree_neighbours):
-                feature_count = len(nth_degree_neighbours[distance - 1]) if nth_degree_neighbours[distance - 1] is not None else 0
+                feature_count = (
+                    len(nth_degree_neighbours[distance - 1])
+                    if nth_degree_neighbours[distance - 1] is not None
+                    else 0
+                )
                 print_and_save(f"Distance {distance}: {feature_count} features", report)
-        
+
         print_and_save("## Experiment Setup", report)
         # Setup experiment parameters
-        feature_set_sizes = [5, 10, 20, 40, 50, 60, 80, 100]  # Focus on most relevant sizes
+        feature_set_sizes = [
+            5,
+            10,
+            20,
+            40,
+            50,
+            60,
+            80,
+            100,
+        ]  # Focus on most relevant sizes
         models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
-        
+
         # Define the feature selection methods
         feature_selection_methods = {}
-        
-        # Joint MRMR + Network methods (3 distances)
-        for distance in [1, 2, 3]:
+
+        # Joint MRMR + Network methods (focus on distances 2, 3, and 4 - distance 1 has only 2 features)
+        for distance in [2, 3, 4]:
             method_name = f"mrmr_network_d{distance}"
-            # Create partial function with network parameters
-            def create_network_method(dist):
-                return lambda X, y, k: mrmr_network_select_wrapper(
+            # Create partial function with network parameters using lambda with default argument
+            feature_selection_methods[method_name] = (
+                lambda X, y, k, dist=distance: mrmr_network_select_wrapper(
                     X, y, k, nth_degree_neighbours, dist
                 )
-            feature_selection_methods[method_name] = create_network_method(distance)
-        
+            )
+
         # Standalone statistical methods
         feature_selection_methods["mrmr"] = mrmr_select_fcq_fast
         feature_selection_methods["anova_filter"] = f_regression_select
-        
+
         # Negative control
         feature_selection_methods["random_select"] = random_select_wrapper
-        
-        print_and_save(f"Benchmarking {len(feature_selection_methods)} methods across {len(feature_set_sizes)} feature sizes and {len(models)} models", report)
-        print_and_save(f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}", report)
-        print_and_save("Methods: MRMR+Network (d1, d2, d3), MRMR, ANOVA-filter, and Random Selection (negative control)", report)
-        
+
+        print_and_save(
+            f"Benchmarking {len(feature_selection_methods)} methods across {len(feature_set_sizes)} feature sizes and {len(models)} models",
+            report,
+        )
+        print_and_save(
+            f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}",
+            report,
+        )
+        print_and_save(
+            "Methods: MRMR+Network (d2, d3, d4), MRMR, ANOVA-filter, and Random Selection (negative control)",
+            report,
+        )
+
         print_and_save("## Powerkit Setup", report)
         # Initialize Powerkit with proteomics data
         pk = Powerkit(feature_data, label_data)
-        
+
         # Register all conditions (method × size × model combinations)
-        rngs = np.random.RandomState(42).randint(0, 100000, size=1)  # Single run for batch execution
-        
+        rngs = np.random.RandomState(42).randint(
+            0, 100000, size=1
+        )  # Single run for batch execution
+
         start_time = time.time()
-        
+
         for method_name, selection_method in feature_selection_methods.items():
             for k in feature_set_sizes:
                 for model_name in models:
                     # Create condition name
                     condition = f"{method_name}_k{k}_{model_name}"
-                    
+
                     # Create pipeline for this method and size
-                    pipeline_func = create_feature_selection_pipeline(selection_method, k, method_name, model_name)
-                    
+                    pipeline_func = create_feature_selection_pipeline(
+                        selection_method, k, method_name, model_name
+                    )
+
                     # Add condition to Powerkit
                     pk.add_condition(
                         condition=condition,
@@ -393,76 +488,122 @@ def main():
                         pipeline_function=pipeline_func,
                         pipeline_args={},
                         eval_function=feature_selection_eval,
-                        eval_args={"metric_primary": "r2"}
+                        eval_args={"metric_primary": "r2"},
                     )
-        
-        print_and_save(f"Registered {len(pk.conditions)} conditions in {time.time() - start_time:.2f} seconds", report)
-        
+
+        print_and_save(
+            f"Registered {len(pk.conditions)} conditions in {time.time() - start_time:.2f} seconds",
+            report,
+        )
+
         print_and_save("## Benchmark Execution", report)
         # Run all conditions using Powerkit's parallel processing
         print_and_save("Starting feature selection benchmark...", report)
-        print_and_save(f"Running with {len(rngs)} random seeds and -1 n_jobs for maximum parallelization", report)
-        
+        print_and_save(
+            f"Running with {len(rngs)} random seeds and -1 n_jobs for maximum parallelization",
+            report,
+        )
+
         benchmark_start = time.time()
         df_benchmark = pk.run_all_conditions(rng_list=rngs, n_jobs=-1, verbose=True)
         benchmark_time = time.time() - benchmark_start
-        
+
         print_and_save(f"Benchmark completed in {benchmark_time:.2f} seconds", report)
         print_and_save(f"Results shape: {df_benchmark.shape}", report)
-        
+
         # Extract k value and model name from condition for easier analysis
-        df_benchmark["k_value"] = df_benchmark["condition"].str.extract(r'k(\d+)').astype(int)
-        df_benchmark["method"] = df_benchmark["condition"].str.split('_').str[0]
-        df_benchmark["model_name"] = df_benchmark["condition"].str.split('_').str[2]
-        
+        df_benchmark["k_value"] = (
+            df_benchmark["condition"].str.extract(r"k(\d+)").astype(int)
+        )
+        df_benchmark["method"] = df_benchmark["condition"].str.split("_").str[0]
+        df_benchmark["model_name"] = df_benchmark["condition"].str.split("_").str[2]
+
         print_and_save("## Results", report)
         print_and_save("### Condition Breakdown", report)
         print_and_save("Condition breakdown:", report)
-        print_and_save(df_benchmark[["condition", "method", "k_value", "model_name"]].head(10).to_string(), report)
-        
+        print_and_save(
+            df_benchmark[["condition", "method", "k_value", "model_name"]]
+            .head(10)
+            .to_string(),
+            report,
+        )
+
         # Save results
-        df_benchmark.to_pickle(f"{file_save_path}feature_selection_benchmark_{exp_id}.pkl")
-        print_and_save(f"Results saved to: {file_save_path}feature_selection_benchmark_{exp_id}.pkl", report)
-        
+        df_benchmark.to_pickle(
+            f"{file_save_path}feature_selection_benchmark_{exp_id}.pkl"
+        )
+        print_and_save(
+            f"Results saved to: {file_save_path}feature_selection_benchmark_{exp_id}.pkl",
+            report,
+        )
+
         print_and_save("### Performance Summary", report)
         print_and_save("Benchmark Summary:", report)
         print_and_save(f"Total runs: {len(df_benchmark)}", report)
-        print_and_save(f"Unique conditions: {df_benchmark['condition'].nunique()}", report)
-        print_and_save(f"Performance range (R²): {df_benchmark['model_performance'].min():.4f} to {df_benchmark['model_performance'].max():.4f}", report)
+        print_and_save(
+            f"Unique conditions: {df_benchmark['condition'].nunique()}", report
+        )
+        print_and_save(
+            f"Performance range (R²): {df_benchmark['model_performance'].min():.4f} to {df_benchmark['model_performance'].max():.4f}",
+            report,
+        )
 
         # Show performance by method
-        method_summary = df_benchmark.groupby("method")["model_performance"].agg(["mean", "std", "count"])
+        method_summary = df_benchmark.groupby("method")["model_performance"].agg(
+            ["mean", "std", "count"]
+        )
         print_and_save("\nPerformance by method:", report)
         print_and_save(method_summary.round(4).to_string(), report)
 
         print_and_save("### Feature Selection Time Analysis", report)
         print_and_save("Feature Selection Time Analysis:", report)
-        print_and_save(f"Feature selection time range: {df_benchmark['feature_selection_time'].min():.6f} to {df_benchmark['feature_selection_time'].max():.6f} seconds", report)
-        
+        print_and_save(
+            f"Feature selection time range: {df_benchmark['feature_selection_time'].min():.6f} to {df_benchmark['feature_selection_time'].max():.6f} seconds",
+            report,
+        )
+
         # Time analysis by method
-        time_summary = df_benchmark.groupby("method")["feature_selection_time"].agg(["mean", "std", "count"])
+        time_summary = df_benchmark.groupby("method")["feature_selection_time"].agg(
+            ["mean", "std", "count"]
+        )
         print_and_save("\nFeature Selection Time by Method:", report)
         print_and_save(time_summary.round(6).to_string(), report)
-        
+
         # Time analysis by k value
-        k_time_summary = df_benchmark.groupby("k_value")["feature_selection_time"].agg(["mean", "std", "count"])
+        k_time_summary = df_benchmark.groupby("k_value")["feature_selection_time"].agg(
+            ["mean", "std", "count"]
+        )
         print_and_save("\nFeature Selection Time by k Value:", report)
         print_and_save(k_time_summary.round(6).to_string(), report)
-        
+
         # Time vs. performance correlation
-        time_perf_corr = df_benchmark["feature_selection_time"].corr(df_benchmark["model_performance"])
-        print_and_save(f"\nCorrelation between feature selection time and performance (R²): {time_perf_corr:.4f}", report)
+        time_perf_corr = df_benchmark["feature_selection_time"].corr(
+            df_benchmark["model_performance"]
+        )
+        print_and_save(
+            f"\nCorrelation between feature selection time and performance (R²): {time_perf_corr:.4f}",
+            report,
+        )
 
         print_and_save("## Network Analysis", report)
         # Analyze network feature counts for each distance
         print_and_save("Network Feature Counts by Distance:", report)
         for distance in [1, 2, 3]:
             if distance <= len(nth_degree_neighbours):
-                network_features = nth_degree_neighbours[distance - 1] if nth_degree_neighbours[distance - 1] is not None else []
-                print_and_save(f"Distance {distance}: {len(network_features)} features", report)
-        
+                network_features = (
+                    nth_degree_neighbours[distance - 1]
+                    if nth_degree_neighbours[distance - 1] is not None
+                    else []
+                )
+                print_and_save(
+                    f"Distance {distance}: {len(network_features)} features", report
+                )
+
         print_and_save("## Conclusion", report)
-        print_and_save("Feature selection benchmarking with network integration completed successfully!", report)
+        print_and_save(
+            "Feature selection benchmarking with network integration completed successfully!",
+            report,
+        )
         print_and_save(f"Report saved to: {report_file}", report)
 
 

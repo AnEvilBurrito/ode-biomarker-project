@@ -68,6 +68,42 @@ def gffs_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
     return selected_features, scores
 
 
+def mrmr_with_anova_prefilter(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
+    """MRMR feature selection with pre-ANOVA filtering of top 100 features"""
+    # First apply ANOVA filtering to select top 100 features
+    anova_k = min(100, X.shape[1])
+    anova_features, _ = f_regression_select(X, y, anova_k)
+    
+    # Run MRMR on the pre-filtered features
+    X_filtered = X[anova_features]
+    selected_features, scores = mrmr_select_fcq_fast(X_filtered, y, k)
+    
+    return selected_features, scores
+
+
+def gffs_with_anova_prefilter(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
+    """GFFS feature selection with pre-ANOVA filtering of top 100 features"""
+    from sklearn.svm import SVR
+    
+    # First apply ANOVA filtering to select top 100 features
+    anova_k = min(100, X.shape[1])
+    anova_features, _ = f_regression_select(X, y, anova_k)
+    
+    # Create SVR model with linear kernel
+    svr_model = SVR(kernel='linear', C=1.0)
+    
+    # Find starting feature (most correlated with target) from pre-filtered set
+    X_filtered = X[anova_features]
+    start_feature = get_most_correlated_feature(X_filtered, y)
+    
+    # Run GFFS on the pre-filtered features
+    selected_features, scores = greedy_feedforward_select(
+        X_filtered, y, k, svr_model, start_feature, cv=5, scoring_method='r2', verbose=0
+    )
+    
+    return selected_features, scores
+
+
 def _drop_correlated_columns(X: pd.DataFrame, threshold: float = 0.95) -> List[str]:
     """Drop highly correlated columns to reduce redundancy"""
     import warnings
@@ -277,7 +313,7 @@ def main():
     
     # Setup experiment parameters
     folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-    exp_id = "v4_gffs_included"
+    exp_id = "v5_mrmr_vs_gffs_anova_prefilter"
     
     # Create results directory
     if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}"):
@@ -329,18 +365,15 @@ def main():
         feature_set_sizes = [5, 10, 20, 40]  # Limited to focus on most relevant sizes
         models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
         
-        # Define the feature selection methods including random selection as negative control
+        # Define the feature selection methods - only MRMR and GFFS with pre-ANOVA filtering
         feature_selection_methods = {
-            "anova_filter": f_regression_select,        # Renamed as ANOVA-filter
-            "mrmr": mrmr_select_fcq_fast,              # MRMR method
-            "mutual_info": mutual_information_select,  # Mutual Information method
-            "gffs": gffs_select_wrapper,               # GFFS method (new addition)
-            "random_select": random_select_wrapper     # Random selection as negative control
+            "mrmr_anova_prefilter": mrmr_with_anova_prefilter,  # MRMR with pre-ANOVA filtering
+            "gffs_anova_prefilter": gffs_with_anova_prefilter,  # GFFS with pre-ANOVA filtering
         }
         
         print_and_save(f"Benchmarking {len(feature_selection_methods)} methods across {len(feature_set_sizes)} feature sizes and {len(models)} models", report)
         print_and_save(f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}", report)
-        print_and_save("Methods: ANOVA-filter, MRMR, Mutual Information, GFFS, and Random Selection (negative control)", report)
+        print_and_save("Methods: MRMR with pre-ANOVA filtering (top 100 features), GFFS with pre-ANOVA filtering (top 100 features)", report)
         
         print_and_save("## Powerkit Setup", report)
         # Initialize Powerkit with proteomics data
@@ -404,9 +437,9 @@ def main():
         print_and_save(f"Unique conditions: {df_benchmark['condition'].nunique()}", report)
         print_and_save(f"Performance range (R²): {df_benchmark['model_performance'].min():.4f} to {df_benchmark['model_performance'].max():.4f}", report)
 
-        # Show performance by method (including random selection as negative control)
+        # Show performance by method
         method_summary = df_benchmark.groupby("method")["model_performance"].agg(["mean", "std", "count"])
-        print_and_save("\nPerformance by method (ANOVA-filter, MRMR, Mutual Information, GFFS, Random Selection):", report)
+        print_and_save("\nPerformance by method (MRMR with pre-ANOVA filtering, GFFS with pre-ANOVA filtering):", report)
         print_and_save(method_summary.round(4).to_string(), report)
 
         print_and_save("### Feature Selection Time Analysis", report)
