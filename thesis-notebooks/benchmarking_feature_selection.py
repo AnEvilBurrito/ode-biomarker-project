@@ -44,7 +44,7 @@ data_link = DataLink(path_loader, "data_codes.csv")
 
 # %%
 folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-exp_id = "v1"
+exp_id = "v3_rep10"
 
 if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}"):
     os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}")
@@ -502,7 +502,7 @@ plt.xticks(ticks=range(4),
 plt.yticks(fontsize=12)
 plt.grid(axis='y', alpha=0.2, linestyle='--')
 plt.tight_layout()
-plt.savefig(f"{file_save_path}method_comparison_boxplot.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}method_comparison_boxplot_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -541,7 +541,7 @@ for i, bar in enumerate(bars):
 
 plt.grid(axis='y', alpha=0.2, linestyle='--')
 plt.tight_layout()
-plt.savefig(f"{file_save_path}method_performance_bar.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}method_performance_bar_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -611,7 +611,7 @@ plt.yticks(fontsize=12)
 plt.grid(True, alpha=0.2, linestyle='--')
 plt.legend(title='Feature Selection Method', fontsize=11, framealpha=0.9)
 plt.tight_layout()
-plt.savefig(f"{file_save_path}performance_vs_k_value.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}performance_vs_k_value_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -626,7 +626,7 @@ model_k_stats = df_benchmark.groupby(['method', 'k_value', 'model_name'])['model
 
 # Create subplots for each model
 models = ['KNeighborsRegressor', 'LinearRegression', 'SVR']
-fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+fig, axes = plt.subplots(3, 1, figsize=(9, 18))
 
 # Define publication-quality color palette and markers
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
@@ -649,18 +649,18 @@ for i, model in enumerate(models):
                             alpha=0.15, color=colors[j])
     
     axes[i].set_title(f'{model}', fontsize=14, fontweight='bold')
-    axes[i].set_xlabel('Number of Features Selected (k)', fontsize=12, fontweight='bold')
-    axes[i].set_ylabel('Mean R² Score', fontsize=12, fontweight='bold')
+    axes[i].set_xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+    axes[i].set_ylabel('Mean R² Score', fontsize=14, fontweight='bold')
     axes[i].set_xscale('log')
-    axes[i].set_xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=10)
-    axes[i].tick_params(axis='y', labelsize=10)
+    axes[i].set_xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=14)
+    axes[i].tick_params(axis='y', labelsize=14)
     axes[i].grid(True, alpha=0.2, linestyle='--')
-    axes[i].legend(fontsize=10, framealpha=0.9)
+    axes[i].legend(fontsize=14, framealpha=0.9)
 
 plt.suptitle('Feature Selection Performance vs. k Value by ML Model', 
              fontsize=16, fontweight='bold', y=1.02)
 plt.tight_layout()
-plt.savefig(f"{file_save_path}performance_vs_k_by_model.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}performance_vs_k_by_model_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -737,7 +737,7 @@ plt.yticks(fontsize=12)
 plt.grid(True, alpha=0.2, linestyle='--')
 plt.legend(title='Feature Selection Method', fontsize=11, framealpha=0.9)
 plt.tight_layout()
-plt.savefig(f"{file_save_path}performance_vs_k_value_excluding_{'_'.join(map(str, k_values_to_exclude))}.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}{exp_id}performance_vs_k_value_excluding_{'_'.join(map(str, k_values_to_exclude))}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 save_and_print(f"Created visualization excluding k values: {k_values_to_exclude}", print_report_file, level="info")
@@ -781,7 +781,7 @@ plt.xlim(left=9, right=170)
 plt.grid(True, alpha=0.2, linestyle='--')
 plt.legend(title='Feature Selection Method', fontsize=14, framealpha=0.9)
 plt.tight_layout()
-plt.savefig(f"{file_save_path}performance_vs_k_value_no_error_bars.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}performance_vs_k_value_no_error_bars_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 print("Created line plot without standard error bars")
@@ -846,7 +846,7 @@ for i, bar in enumerate(bars):
              f'{height}', ha='center', va='bottom', fontsize=10, fontweight='bold')
 
 plt.tight_layout()
-plt.savefig(f"{file_save_path}top_features_frequency.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}top_features_frequency_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -912,7 +912,7 @@ for i, method in enumerate(methods):
 plt.suptitle('Top 10 Most Frequently Selected Features by Method', 
              fontsize=16, fontweight='bold', y=0.98)
 plt.tight_layout()
-plt.savefig(f"{file_save_path}top_features_by_method.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}top_features_by_method_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %% [markdown]
@@ -1007,7 +1007,7 @@ plt.title('Feature Selection Frequency by Method (Top 30 Features)',
 plt.xlabel('Feature Selection Method', fontsize=14, fontweight='bold')
 plt.ylabel('Feature', fontsize=14, fontweight='bold')
 plt.tight_layout()
-plt.savefig(f"{file_save_path}feature_selection_heatmap.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}feature_selection_heatmap_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -1154,7 +1154,7 @@ plt.yticks(fontsize=12)
 plt.grid(True, alpha=0.2, linestyle='--')
 plt.legend(title='Feature Selection Method', fontsize=11, framealpha=0.9)
 plt.tight_layout()
-plt.savefig(f"{file_save_path}stability_vs_k_value.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}stability_vs_k_value_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
@@ -1228,7 +1228,7 @@ if len(methods_plot) > 0:
     
     plt.grid(axis='y', alpha=0.2, linestyle='--')
     plt.tight_layout()
-    plt.savefig(f"{file_save_path}overall_stability_comparison.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"{file_save_path}overall_stability_comparison_{exp_id}.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 # %%
@@ -1261,7 +1261,7 @@ plt.title('Feature Selection Stability by Method and k-value',
 plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
 plt.ylabel('Feature Selection Method', fontsize=14, fontweight='bold')
 plt.tight_layout()
-plt.savefig(f"{file_save_path}stability_heatmap.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}stability_heatmap_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
 # %%
