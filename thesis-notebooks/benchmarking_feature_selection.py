@@ -430,6 +430,7 @@ def save_and_print(message, report_file=None, level="info"):
 # Load saved feature selection benchmark (feature_selection_benchmark_v1.pkl)
 import os
 import pandas as pd
+import time #noqa: E402
 
 # Create a new report file for capturing print statements
 print_report_path = f"{file_save_path}feature_selection_print_report_{exp_id}.md"
@@ -455,14 +456,17 @@ except Exception:
     save_and_print(df_benchmark.head().to_string(), print_report_file, level="info")
 
 # Re-define variables that might be needed in the loaded section
-feature_set_sizes = [10, 20, 40, 80, 160, 320, 640, 1280]
+# Use actual k-values present in the data instead of predefined list
+feature_set_sizes = sorted(df_benchmark['k_value'].unique())
 models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
 method_labels = {
-    'anova_filter': 'ANOVA-Filter',
+    'anova': 'ANOVA-Filter',
     'mrmr': 'MRMR', 
-    'mutual_info': 'Mutual Information',
-    'random_select': 'Random Selection'
+    'mutual': 'Mutual Information',
+    'random': 'Random Selection'
 }
+
+print(f"Actual k-values present in data: {feature_set_sizes}")
 
 # %% [markdown]
 # ### Performance Comparison: Feature Selection Methods
@@ -478,7 +482,7 @@ sns.set_palette("husl")
 
 # Create publication-quality box plot comparing methods across all feature sizes and models
 plt.figure(figsize=(10, 6), dpi=300)
-plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.family'] = 'sans'
 plt.rcParams['font.size'] = 12
 plt.rcParams['axes.linewidth'] = 1.2
 
@@ -486,14 +490,14 @@ plt.rcParams['axes.linewidth'] = 1.2
 colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
 
 sns.boxplot(data=df_benchmark, x='method', y='model_performance', 
-            order=['anova_filter', 'mrmr', 'mutual_info', 'random_select'],
+            order=['anova', 'mrmr', 'mutual', 'random'],
             palette=colors, width=0.6, fliersize=3)
 plt.title('Feature Selection Method Performance Comparison', 
           fontsize=16, fontweight='bold', pad=20)
 plt.xlabel('Feature Selection Method', fontsize=14, fontweight='bold')
 plt.ylabel('R² Score', fontsize=14, fontweight='bold')
 plt.xticks(ticks=range(4), 
-           labels=[method_labels[m] for m in ['anova_filter', 'mrmr', 'mutual_info', 'random_select']],
+           labels=[method_labels[m] for m in ['anova', 'mrmr', 'mutual', 'random']],
            rotation=45, fontsize=12)
 plt.yticks(fontsize=12)
 plt.grid(axis='y', alpha=0.2, linestyle='--')
@@ -507,7 +511,7 @@ method_stats = df_benchmark.groupby('method')['model_performance'].agg(['mean', 
 
 # Create publication-quality bar plot with error bars
 plt.figure(figsize=(10, 6), dpi=300)
-plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.family'] = 'sans'
 plt.rcParams['font.size'] = 12
 plt.rcParams['axes.linewidth'] = 1.2
 
@@ -541,33 +545,6 @@ plt.savefig(f"{file_save_path}method_performance_bar.png", dpi=300, bbox_inches=
 plt.show()
 
 # %%
-# Create publication-quality faceted box plots by model type
-plt.rcParams['font.family'] = 'serif'
-plt.rcParams['font.size'] = 12
-plt.rcParams['axes.linewidth'] = 1.2
-
-# Define publication-quality color palette
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
-
-g = sns.catplot(data=df_benchmark, x='method', y='model_performance', 
-                col='model_name', kind='box', height=6, aspect=1.2,
-                order=['anova_filter', 'mrmr', 'mutual_info', 'random_select'],
-                palette=colors, width=0.6, fliersize=3)
-g.set_titles("Model: {col_name}", fontsize=14, fontweight='bold')
-g.set_axis_labels("Feature Selection Method", "R² Score", fontsize=12, fontweight='bold')
-g.fig.suptitle('Feature Selection Performance by ML Model', y=1.02, fontsize=16, fontweight='bold')
-
-# Customize the plot appearance
-for ax in g.axes.flat:
-    ax.tick_params(axis='x', rotation=45, labelsize=10)
-    ax.tick_params(axis='y', labelsize=10)
-    ax.grid(True, alpha=0.2, linestyle='--')
-
-plt.tight_layout()
-plt.savefig(f"{file_save_path}performance_by_model_boxplot.png", dpi=300, bbox_inches='tight')
-plt.show()
-
-# %%
 # Create comprehensive statistical summary
 summary_table = df_benchmark.groupby('method')['model_performance'].agg([
     ('count', 'count'),
@@ -589,8 +566,8 @@ save_and_print(summary_table.to_string(), print_report_file, level="info")
 # %%
 # Derive feature_set_sizes from the dataframe to handle different runs
 feature_set_sizes_viz = sorted(df_benchmark['k_value'].unique())
-# Re-define feature_set_sizes for consistency
-feature_set_sizes = [10, 20, 40, 80, 160, 320, 640, 1280]
+# Use actual k-values from data for consistency
+feature_set_sizes = feature_set_sizes_viz
 
 # Calculate mean and standard deviation for each method and k value
 k_performance_stats = df_benchmark.groupby(['method', 'k_value'])['model_performance'].agg(['mean', 'std', 'count']).reset_index()
@@ -640,7 +617,7 @@ plt.show()
 # %%
 # Create publication-quality faceted line plots by model type
 plt.figure(figsize=(18, 6), dpi=300)
-plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.family'] = 'sans'
 plt.rcParams['font.size'] = 12
 plt.rcParams['axes.linewidth'] = 1.2
 
@@ -1053,6 +1030,280 @@ for method in methods:
     save_and_print(f"  Unique features: {unique_features}", print_report_file, level="info")
     save_and_print(f"  Average selections per feature: {avg_selections:.1f}", print_report_file, level="info")
     save_and_print(f"  Most frequent feature: {method_feature_freq[method].index[0]} ({method_feature_freq[method].iloc[0]} selections)", print_report_file, level="info")
+
+# Close the print report file
+print_report_file.close()
+print(f"Print report saved to: {print_report_path}")
+
+# %% [markdown]
+# ### Feature Selection Stability Analysis (Intra-Method Jaccard Similarity)
+
+# %%
+# Re-open the print report file for stability analysis
+print_report_file = open(print_report_path, 'a', encoding='utf-8')
+
+# Calculate Jaccard similarity within methods across different runs
+save_and_print("Analyzing feature selection stability using intra-method Jaccard similarity...", print_report_file, level="section")
+
+def jaccard_similarity(set1, set2):
+    """Calculate Jaccard similarity between two sets"""
+    if len(set1) == 0 and len(set2) == 0:
+        return 1.0  # Both empty sets are considered identical
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    return intersection / union if union > 0 else 0.0
+
+# Group runs by method and k-value
+stability_analysis = {}
+methods = ['anova', 'mrmr', 'mutual', 'random']
+
+for method in methods:
+    method_data = df_benchmark[df_benchmark['method'] == method]
+    stability_analysis[method] = {}
+    
+    for k_value in feature_set_sizes:
+        k_data = method_data[method_data['k_value'] == k_value]
+        
+        if len(k_data) < 2:
+            # Need at least 2 runs to calculate similarity
+            stability_analysis[method][k_value] = {'mean_jaccard': np.nan, 'std_jaccard': np.nan, 'n_runs': len(k_data)}
+            continue
+        
+        # Extract feature sets for this method and k-value
+        feature_sets = []
+        for idx, row in k_data.iterrows():
+            selected_features = row['selected_features']
+            # Handle different data types
+            if hasattr(selected_features, '__iter__') and not isinstance(selected_features, (str, dict)):
+                if hasattr(selected_features, 'tolist'):
+                    selected_features = selected_features.tolist()
+                elif not isinstance(selected_features, list):
+                    selected_features = list(selected_features)
+                feature_sets.append(set(selected_features))
+        
+        # Calculate pairwise Jaccard similarities
+        jaccard_similarities = []
+        for i in range(len(feature_sets)):
+            for j in range(i + 1, len(feature_sets)):
+                similarity = jaccard_similarity(feature_sets[i], feature_sets[j])
+                jaccard_similarities.append(similarity)
+        
+        if len(jaccard_similarities) > 0:
+            stability_analysis[method][k_value] = {
+                'mean_jaccard': np.mean(jaccard_similarities),
+                'std_jaccard': np.std(jaccard_similarities),
+                'n_runs': len(k_data),
+                'n_comparisons': len(jaccard_similarities)
+            }
+        else:
+            stability_analysis[method][k_value] = {'mean_jaccard': np.nan, 'std_jaccard': np.nan, 'n_runs': len(k_data)}
+
+# Display stability analysis results
+save_and_print("Intra-Method Feature Selection Stability (Jaccard Similarity):", print_report_file, level="subsection")
+for method in methods:
+    save_and_print(f"\n{method_labels.get(method, method)}:", print_report_file, level="info")
+    for k_value in feature_set_sizes:
+        if k_value in stability_analysis[method]:
+            stats = stability_analysis[method][k_value]
+            if not np.isnan(stats['mean_jaccard']):
+                save_and_print(f"  k={k_value}: Mean Jaccard = {stats['mean_jaccard']:.3f} ± {stats['std_jaccard']:.3f} "
+                      f"(n_runs={stats['n_runs']}, comparisons={stats['n_comparisons']})", print_report_file, level="info")
+
+# %%
+# Create publication-quality line plot showing stability vs. k-value
+plt.figure(figsize=(10, 6), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+markers = ['o', 's', '^', 'D']  # Circle, Square, Triangle, Diamond
+
+# Plot each method's stability
+for i, method in enumerate(methods):
+    k_values = []
+    mean_jaccards = []
+    std_jaccards = []
+    
+    for k_value in feature_set_sizes:
+        if k_value in stability_analysis[method] and not np.isnan(stability_analysis[method][k_value]['mean_jaccard']):
+            k_values.append(k_value)
+            mean_jaccards.append(stability_analysis[method][k_value]['mean_jaccard'])
+            std_jaccards.append(stability_analysis[method][k_value]['std_jaccard'])
+    
+    if len(k_values) > 0:
+        plt.plot(k_values, mean_jaccards, 
+                 marker=markers[i], linewidth=2.5, markersize=8, 
+                 color=colors[i], markeredgecolor='white', markeredgewidth=1,
+                 label=method_labels.get(method, method))
+        
+        # Add standard deviation bands
+        plt.fill_between(k_values, 
+                         np.array(mean_jaccards) - np.array(std_jaccards),
+                         np.array(mean_jaccards) + np.array(std_jaccards),
+                         alpha=0.15, color=colors[i])
+
+plt.title('Feature Selection Stability vs. Number of Features Selected', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+plt.ylabel('Mean Jaccard Similarity ± Std. Dev.', fontsize=14, fontweight='bold')
+plt.xscale('log')  # Use log scale for better visualization
+plt.xticks(feature_set_sizes, feature_set_sizes, fontsize=12)
+plt.yticks(fontsize=12)
+plt.grid(True, alpha=0.2, linestyle='--')
+plt.legend(title='Feature Selection Method', fontsize=11, framealpha=0.9)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}stability_vs_k_value.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Calculate overall stability metrics for each method
+overall_stability = {}
+for method in methods:
+    all_jaccards = []
+    for k_value in feature_set_sizes:
+        if k_value in stability_analysis[method] and not np.isnan(stability_analysis[method][k_value]['mean_jaccard']):
+            # Get individual Jaccard values for this k-value (approximate by using mean)
+            n_comparisons = stability_analysis[method][k_value]['n_comparisons']
+            if n_comparisons > 0:
+                mean_jaccard = stability_analysis[method][k_value]['mean_jaccard']
+                # Add multiple instances weighted by number of comparisons
+                all_jaccards.extend([mean_jaccard] * n_comparisons)
+    
+    if len(all_jaccards) > 0:
+        overall_stability[method] = {
+            'mean_jaccard': np.mean(all_jaccards),
+            'std_jaccard': np.std(all_jaccards),
+            'total_comparisons': len(all_jaccards)
+        }
+    else:
+        overall_stability[method] = {'mean_jaccard': np.nan, 'std_jaccard': np.nan, 'total_comparisons': 0}
+
+# Display overall stability summary
+save_and_print("Overall Feature Selection Stability Summary:", print_report_file, level="subsection")
+for method in methods:
+    if method in overall_stability and not np.isnan(overall_stability[method]['mean_jaccard']):
+        stats = overall_stability[method]
+        save_and_print(f"{method_labels.get(method, method)}: "
+              f"Mean Jaccard = {stats['mean_jaccard']:.3f} ± {stats['std_jaccard']:.3f} "
+              f"(total comparisons={stats['total_comparisons']})", print_report_file, level="info")
+
+# %%
+# Create publication-quality bar plot comparing overall stability
+plt.figure(figsize=(10, 6), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Prepare data for bar plot
+methods_plot = []
+mean_jaccards = []
+std_jaccards = []
+
+for method in methods:
+    if method in overall_stability and not np.isnan(overall_stability[method]['mean_jaccard']):
+        methods_plot.append(method_labels.get(method, method))
+        mean_jaccards.append(overall_stability[method]['mean_jaccard'])
+        std_jaccards.append(overall_stability[method]['std_jaccard'])
+
+if len(methods_plot) > 0:
+    bars = plt.bar(range(len(methods_plot)), mean_jaccards, 
+                   yerr=std_jaccards, capsize=8, alpha=0.8,
+                   color=colors[:len(methods_plot)], edgecolor='black', linewidth=1)
+    
+    plt.title('Overall Feature Selection Stability by Method', 
+              fontsize=16, fontweight='bold', pad=20)
+    plt.xlabel('Feature Selection Method', fontsize=14, fontweight='bold')
+    plt.ylabel('Mean Jaccard Similarity ± Std. Dev.', fontsize=14, fontweight='bold')
+    plt.xticks(range(len(methods_plot)), methods_plot, rotation=45, fontsize=12)
+    plt.yticks(fontsize=12)
+    
+    # Add value labels on bars
+    for i, bar in enumerate(bars):
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                 f'{height:.3f} ± {std_jaccards[i]:.3f}',
+                 ha='center', va='bottom', fontsize=11, fontweight='bold')
+    
+    plt.grid(axis='y', alpha=0.2, linestyle='--')
+    plt.tight_layout()
+    plt.savefig(f"{file_save_path}overall_stability_comparison.png", dpi=300, bbox_inches='tight')
+    plt.show()
+
+# %%
+# Create stability heatmap by method and k-value
+plt.figure(figsize=(9, 6), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 10
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Create stability matrix for heatmap
+stability_matrix = []
+for method in methods:
+    row = []
+    for k_value in feature_set_sizes:
+        if k_value in stability_analysis[method] and not np.isnan(stability_analysis[method][k_value]['mean_jaccard']):
+            row.append(stability_analysis[method][k_value]['mean_jaccard'])
+        else:
+            row.append(np.nan)
+    stability_matrix.append(row)
+
+stability_df = pd.DataFrame(stability_matrix, index=[method_labels.get(m, m) for m in methods], 
+                           columns=feature_set_sizes)
+
+# Create heatmap
+sns.heatmap(stability_df, annot=True, fmt='.3f', cmap='YlOrRd', 
+            cbar_kws={'label': 'Jaccard Similarity'}, 
+            linewidths=0.5, linecolor='white')
+plt.title('Feature Selection Stability by Method and k-value', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+plt.ylabel('Feature Selection Method', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.savefig(f"{file_save_path}stability_heatmap.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Statistical comparison of stability between methods
+save_and_print("Statistical Comparison of Feature Selection Stability:", print_report_file, level="subsection")
+
+# Collect all Jaccard values for statistical comparison
+method_jaccards = {}
+for method in methods:
+    jaccards = []
+    for k_value in feature_set_sizes:
+        if k_value in stability_analysis[method] and not np.isnan(stability_analysis[method][k_value]['mean_jaccard']):
+            n_comparisons = stability_analysis[method][k_value]['n_comparisons']
+            mean_jaccard = stability_analysis[method][k_value]['mean_jaccard']
+            jaccards.extend([mean_jaccard] * n_comparisons)
+    method_jaccards[method] = jaccards
+
+# Compare methods pairwise
+from scipy.stats import ttest_ind
+
+for i, method1 in enumerate(methods):
+    for j, method2 in enumerate(methods):
+        if i < j and len(method_jaccards[method1]) > 0 and len(method_jaccards[method2]) > 0:
+            t_stat, p_value = ttest_ind(method_jaccards[method1], method_jaccards[method2])
+            save_and_print(f"{method_labels.get(method1, method1)} vs {method_labels.get(method2, method2)}: "
+                  f"t={t_stat:.3f}, p={p_value:.4f}", print_report_file, level="info")
+
+# %%
+# Summary of stability analysis
+save_and_print("Feature Selection Stability Analysis Summary:", print_report_file, level="section")
+
+# Rank methods by stability
+stability_ranking = []
+for method in methods:
+    if method in overall_stability and not np.isnan(overall_stability[method]['mean_jaccard']):
+        stability_ranking.append((method, overall_stability[method]['mean_jaccard']))
+
+stability_ranking.sort(key=lambda x: x[1], reverse=True)
+
+save_and_print("Stability Ranking (Highest to Lowest):", print_report_file, level="subsection")
+for i, (method, stability) in enumerate(stability_ranking, 1):
+    save_and_print(f"{i}. {method_labels.get(method, method)}: {stability:.3f}", print_report_file, level="info")
 
 # Close the print report file
 print_report_file.close()
