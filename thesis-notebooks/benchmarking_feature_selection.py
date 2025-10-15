@@ -401,28 +401,68 @@ print(method_summary.round(4))
 # ### Load data
 
 # %%
+def save_and_print(message, report_file=None, level="info"):
+    """
+    Print message to console and save to report file with proper formatting.
+    
+    Args:
+        message: The message to print and save
+        report_file: File object to save to (optional)
+        level: Formatting level - "header", "section", "subsection", or "info"
+    """
+    # Print to console
+    print(message)
+    
+    # Save to report with proper formatting
+    if report_file:
+        if level == "header":
+            report_file.write(f"# {message}\n\n")
+        elif level == "section":
+            report_file.write(f"## {message}\n\n")
+        elif level == "subsection":
+            report_file.write(f"### {message}\n\n")
+        else:  # info level
+            report_file.write(f"{message}\n\n")
+    
+    return message
+
+# %%
 # Load saved feature selection benchmark (feature_selection_benchmark_v1.pkl)
 import os
 import pandas as pd
+
+# Create a new report file for capturing print statements
+print_report_path = f"{file_save_path}feature_selection_print_report_{exp_id}.md"
+print_report_file = open(print_report_path, 'w', encoding='utf-8')
+
+# Write header to the print report
+print_report_file.write(f"# Feature Selection Print Report - {exp_id}\n\n")
+print_report_file.write(f"**Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+print_report_file.write("This report captures all print statements from the Results section with proper formatting.\n\n")
 
 pkl_path = f"{path_loader.get_data_path()}data/results/{folder_name}/feature_selection_benchmark_{exp_id}.pkl"
 if not os.path.exists(pkl_path):
     raise FileNotFoundError(f"Pickle not found: {pkl_path}")
 
 df_benchmark = pd.read_pickle(pkl_path)
-print(f"Loaded df_benchmark with shape: {df_benchmark.shape}")
+save_and_print(f"Loaded df_benchmark with shape: {df_benchmark.shape}", print_report_file, level="section")
 # Display first rows (works in notebook)
 try:
     from IPython.display import display
 
     display(df_benchmark.head())
 except Exception:
-    print(df_benchmark.head().to_string())
+    save_and_print(df_benchmark.head().to_string(), print_report_file, level="info")
 
-
-# %%
-# Basic stats
-
+# Re-define variables that might be needed in the loaded section
+feature_set_sizes = [10, 20, 40, 80, 160, 320, 640, 1280]
+models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
+method_labels = {
+    'anova_filter': 'ANOVA-Filter',
+    'mrmr': 'MRMR', 
+    'mutual_info': 'Mutual Information',
+    'random_select': 'Random Selection'
+}
 
 # %% [markdown]
 # ### Performance Comparison: Feature Selection Methods
@@ -435,13 +475,6 @@ import seaborn as sns
 plt.style.use('seaborn-v0_8')
 sns.set_palette("husl")
 
-# Method labels for better visualization
-method_labels = {
-    'anova_filter': 'ANOVA-Filter',
-    'mrmr': 'MRMR', 
-    'mutual_info': 'Mutual Information',
-    'random_select': 'Random Selection'
-}
 
 # Create publication-quality box plot comparing methods across all feature sizes and models
 plt.figure(figsize=(10, 6), dpi=300)
@@ -547,8 +580,8 @@ summary_table = df_benchmark.groupby('method')['model_performance'].agg([
     ('max', 'max')
 ]).round(4)
 
-print("Performance Statistics by Feature Selection Method:")
-print(summary_table)
+save_and_print("Performance Statistics by Feature Selection Method:", print_report_file, level="section")
+save_and_print(summary_table.to_string(), print_report_file, level="info")
 
 # %% [markdown]
 # ### Performance vs. Feature Set Size (k value)
@@ -556,6 +589,8 @@ print(summary_table)
 # %%
 # Derive feature_set_sizes from the dataframe to handle different runs
 feature_set_sizes_viz = sorted(df_benchmark['k_value'].unique())
+# Re-define feature_set_sizes for consistency
+feature_set_sizes = [10, 20, 40, 80, 160, 320, 640, 1280]
 
 # Calculate mean and standard deviation for each method and k value
 k_performance_stats = df_benchmark.groupby(['method', 'k_value'])['model_performance'].agg(['mean', 'std', 'count']).reset_index()
@@ -653,7 +688,7 @@ plt.show()
 
 # %%
 # Statistical analysis of k value effect
-print("Performance Trend Analysis by k Value:")
+save_and_print("Performance Trend Analysis by k Value:", print_report_file, level="section")
 for method in df_benchmark['method'].unique():
     method_data = df_benchmark[df_benchmark['method'] == method]
     
@@ -665,10 +700,10 @@ for method in df_benchmark['method'].unique():
     k_max_perf = method_data[method_data['k_value'] == 1280]['model_performance'].mean()
     performance_change = k_max_perf - k_min_perf
     
-    print(f"\n{method_labels.get(method, method)}:")
-    print(f"  Correlation (k vs performance): {correlation:.4f}")
-    print(f"  Performance change (k=10 to k=1280): {performance_change:.4f}")
-    print(f"  Optimal k range: {method_data.groupby('k_value')['model_performance'].mean().idxmax()} features")
+    save_and_print(f"\n{method_labels.get(method, method)}:", print_report_file, level="subsection")
+    save_and_print(f"  Correlation (k vs performance): {correlation:.4f}", print_report_file, level="info")
+    save_and_print(f"  Performance change (k=10 to k=1280): {performance_change:.4f}", print_report_file, level="info")
+    save_and_print(f"  Optimal k range: {method_data.groupby('k_value')['model_performance'].mean().idxmax()} features", print_report_file, level="info")
 
 # %% [markdown]
 # ### Performance vs. Feature Set Size (k value) - Excluding Specific k Values
@@ -728,8 +763,8 @@ plt.tight_layout()
 plt.savefig(f"{file_save_path}performance_vs_k_value_excluding_{'_'.join(map(str, k_values_to_exclude))}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
-print(f"Created visualization excluding k values: {k_values_to_exclude}")
-print(f"Remaining k values in visualization: {feature_set_sizes_filtered}")
+save_and_print(f"Created visualization excluding k values: {k_values_to_exclude}", print_report_file, level="info")
+save_and_print(f"Remaining k values in visualization: {feature_set_sizes_filtered}", print_report_file, level="info")
 
 # %% [markdown]
 # ### Performance vs. Feature Set Size (k value) - Without Standard Error Bars
@@ -773,3 +808,252 @@ plt.savefig(f"{file_save_path}performance_vs_k_value_no_error_bars.png", dpi=300
 plt.show()
 
 print("Created line plot without standard error bars")
+
+# %% [markdown]
+# ## Feature Selection Analysis
+
+# %% [markdown]
+# ### Feature Selection Frequency Analysis
+
+# %%
+# Analyze feature selection frequency across all methods
+save_and_print("Analyzing feature selection patterns...", print_report_file, level="section")
+
+# Extract all selected features and create frequency analysis
+all_selected_features = []
+for idx, row in df_benchmark.iterrows():
+    selected_features = row['selected_features']
+    # Handle different data types (list, numpy array, etc.)
+    if hasattr(selected_features, '__iter__') and not isinstance(selected_features, (str, dict)):
+        # Convert to list if it's an iterable (like numpy array)
+        if hasattr(selected_features, 'tolist'):
+            selected_features = selected_features.tolist()
+        elif not isinstance(selected_features, list):
+            selected_features = list(selected_features)
+        
+        if len(selected_features) > 0:
+            all_selected_features.extend(selected_features)
+
+# Calculate overall feature frequency
+feature_frequency = pd.Series(all_selected_features).value_counts().sort_values(ascending=False)
+
+save_and_print(f"Total feature selections: {len(all_selected_features)}", print_report_file, level="info")
+save_and_print(f"Unique features selected: {len(feature_frequency)}", print_report_file, level="info")
+save_and_print("Top 20 most frequently selected features:", print_report_file, level="subsection")
+save_and_print(feature_frequency.head(20).to_string(), print_report_file, level="info")
+
+# %%
+# Create publication-quality bar plot of top selected features
+plt.figure(figsize=(12, 8), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Plot top 20 features
+top_features = feature_frequency.head(20)
+bars = plt.bar(range(len(top_features)), top_features.values, 
+               color='#2ca02c', alpha=0.8, edgecolor='black', linewidth=1)
+
+plt.title('Top 20 Most Frequently Selected Features (All Methods)', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Feature', fontsize=14, fontweight='bold')
+plt.ylabel('Selection Frequency', fontsize=14, fontweight='bold')
+plt.xticks(range(len(top_features)), top_features.index, rotation=45, ha='right', fontsize=10)
+plt.yticks(fontsize=12)
+plt.grid(axis='y', alpha=0.2, linestyle='--')
+
+# Add value labels on bars
+for i, bar in enumerate(bars):
+    height = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+             f'{height}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+plt.tight_layout()
+plt.savefig(f"{file_save_path}top_features_frequency.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Analyze feature selection frequency by method
+method_feature_freq = {}
+for method in df_benchmark['method'].unique():
+    method_features = []
+    method_data = df_benchmark[df_benchmark['method'] == method]
+    
+    for idx, row in method_data.iterrows():
+        selected_features = row['selected_features']
+        # Handle different data types (list, numpy array, etc.)
+        if hasattr(selected_features, '__iter__') and not isinstance(selected_features, (str, dict)):
+            # Convert to list if it's an iterable (like numpy array)
+            if hasattr(selected_features, 'tolist'):
+                selected_features = selected_features.tolist()
+            elif not isinstance(selected_features, list):
+                selected_features = list(selected_features)
+            
+            if len(selected_features) > 0:
+                method_features.extend(selected_features)
+    
+    method_feature_freq[method] = pd.Series(method_features).value_counts().sort_values(ascending=False)
+
+# Display top features for each method
+save_and_print("Top 10 features by method:", print_report_file, level="section")
+for method, freq in method_feature_freq.items():
+    save_and_print(f"\n{method_labels.get(method, method)}:", print_report_file, level="subsection")
+    save_and_print(freq.head(10).to_string(), print_report_file, level="info")
+
+# %%
+# Create publication-quality faceted bar plots by method
+fig, axes = plt.subplots(2, 2, figsize=(16, 12), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 10
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Define publication-quality color palette
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']  # Blue, Orange, Green, Red
+
+methods = ['anova', 'mrmr', 'mutual', 'random']
+for i, method in enumerate(methods):
+    ax = axes[i//2, i%2]
+    top_method_features = method_feature_freq[method].head(10)
+    
+    bars = ax.bar(range(len(top_method_features)), top_method_features.values,
+                  color=colors[i], alpha=0.8, edgecolor='black', linewidth=1)
+    
+    ax.set_title(f'{method_labels.get(method, method)}', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Feature', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Selection Frequency', fontsize=12, fontweight='bold')
+    ax.set_xticks(range(len(top_method_features)))
+    ax.set_xticklabels(top_method_features.index, rotation=45, ha='right', fontsize=9)
+    ax.tick_params(axis='y', labelsize=10)
+    ax.grid(axis='y', alpha=0.2, linestyle='--')
+    
+    # Add value labels on bars
+    for j, bar in enumerate(bars):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                f'{height}', ha='center', va='bottom', fontsize=9, fontweight='bold')
+
+plt.suptitle('Top 10 Most Frequently Selected Features by Method', 
+             fontsize=16, fontweight='bold', y=0.98)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}top_features_by_method.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %% [markdown]
+# ### Method-Specific Feature Comparison
+
+# %%
+# Compare feature selection patterns between methods
+save_and_print("Comparing feature selection patterns between methods...", print_report_file, level="section")
+
+# Create sets of top features for each method (top 50 features)
+top_features_by_method = {}
+for method in methods:
+    top_features_by_method[method] = set(method_feature_freq[method].head(50).index)
+
+# Calculate overlaps between methods
+overlap_analysis = {}
+for i, method1 in enumerate(methods):
+    for j, method2 in enumerate(methods):
+        if i < j:  # Avoid duplicate comparisons
+            overlap = len(top_features_by_method[method1] & top_features_by_method[method2])
+            total_union = len(top_features_by_method[method1] | top_features_by_method[method2])
+            jaccard_similarity = overlap / total_union if total_union > 0 else 0
+            
+            overlap_analysis[f"{method1}_{method2}"] = {
+                'overlap_count': overlap,
+                'jaccard_similarity': jaccard_similarity,
+                'method1_features': len(top_features_by_method[method1]),
+                'method2_features': len(top_features_by_method[method2])
+            }
+
+# Display overlap analysis
+save_and_print("Feature Selection Overlap Analysis (Top 50 features per method):", print_report_file, level="subsection")
+for comparison, stats in overlap_analysis.items():
+    method1, method2 = comparison.split('_')
+    save_and_print(f"\n{method_labels.get(method1, method1)} vs {method_labels.get(method2, method2)}:", print_report_file, level="info")
+    save_and_print(f"  Overlap: {stats['overlap_count']} features", print_report_file, level="info")
+    save_and_print(f"  Jaccard Similarity: {stats['jaccard_similarity']:.3f}", print_report_file, level="info")
+    save_and_print(f"  {method_labels.get(method1, method1)} features: {stats['method1_features']}", print_report_file, level="info")
+    save_and_print(f"  {method_labels.get(method2, method2)} features: {stats['method2_features']}", print_report_file, level="info")
+
+# %%
+# Identify consensus features selected by multiple methods
+consensus_features = {}
+for n_methods in range(2, len(methods) + 1):
+    # Get features selected by at least n_methods
+    feature_method_count = {}
+    for feature in feature_frequency.index:
+        count = 0
+        for method in methods:
+            if feature in top_features_by_method[method]:
+                count += 1
+        feature_method_count[feature] = count
+    
+    consensus_features[n_methods] = [f for f, c in feature_method_count.items() if c >= n_methods]
+
+save_and_print("Consensus Features Analysis:", print_report_file, level="subsection")
+for n_methods, features in consensus_features.items():
+    save_and_print(f"\nFeatures selected by at least {n_methods} methods: {len(features)} features", print_report_file, level="info")
+    if len(features) > 0:
+        save_and_print(f"Top 10: {features[:10]}", print_report_file, level="info")
+
+# %%
+# Create publication-quality heatmap showing feature selection frequency by method
+plt.figure(figsize=(10, 7), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 10
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Get top 30 features overall
+top_30_features = feature_frequency.head(30).index
+
+# Create frequency matrix for heatmap
+freq_matrix = []
+for feature in top_30_features:
+    row = []
+    for method in methods:
+        if feature in method_feature_freq[method]:
+            row.append(method_feature_freq[method][feature])
+        else:
+            row.append(0)
+    freq_matrix.append(row)
+
+freq_df = pd.DataFrame(freq_matrix, index=top_30_features, 
+                       columns=[method_labels.get(m, m) for m in methods])
+
+# Create heatmap
+sns.heatmap(freq_df, annot=True, fmt='d', cmap='YlOrRd', 
+            cbar_kws={'label': 'Selection Frequency'}, 
+            linewidths=0.5, linecolor='white')
+plt.title('Feature Selection Frequency by Method (Top 30 Features)', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Feature Selection Method', fontsize=14, fontweight='bold')
+plt.ylabel('Feature', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.savefig(f"{file_save_path}feature_selection_heatmap.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+# %%
+# Summary statistics for feature selection analysis
+save_and_print("Feature Selection Analysis Summary:", print_report_file, level="section")
+save_and_print(f"Total feature selection events: {len(all_selected_features)}", print_report_file, level="info")
+save_and_print(f"Unique features selected: {len(feature_frequency)}", print_report_file, level="info")
+save_and_print(f"Average selections per feature: {len(all_selected_features) / len(feature_frequency):.1f}", print_report_file, level="info")
+
+# Method-specific statistics
+save_and_print("Method-specific statistics:", print_report_file, level="subsection")
+for method in methods:
+    method_selections = sum(len(row['selected_features']) for idx, row in df_benchmark[df_benchmark['method'] == method].iterrows() 
+                           if isinstance(row['selected_features'], list))
+    unique_features = len(method_feature_freq[method])
+    avg_selections = method_selections / unique_features if unique_features > 0 else 0
+    
+    save_and_print(f"\n{method_labels.get(method, method)}:", print_report_file, level="info")
+    save_and_print(f"  Total selections: {method_selections}", print_report_file, level="info")
+    save_and_print(f"  Unique features: {unique_features}", print_report_file, level="info")
+    save_and_print(f"  Average selections per feature: {avg_selections:.1f}", print_report_file, level="info")
+    save_and_print(f"  Most frequent feature: {method_feature_freq[method].index[0]} ({method_feature_freq[method].iloc[0]} selections)", print_report_file, level="info")
+
+# Close the print report file
+print_report_file.close()
+print(f"Print report saved to: {print_report_path}")
