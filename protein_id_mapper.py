@@ -39,32 +39,71 @@ def create_network_to_proteomics_mapper(mapping_df):
     Returns:
         function: Mapper function that takes network ID and returns proteomics ID
     """
-    # Create a mapping dictionary from the dataframe
-    # Map from goncalve_protein_id to protein_id
-    mapping_dict = {}
+    # Create multiple mapping dictionaries for different strategies
+    
+    # Strategy 1: Direct mapping from full format (e.g., 'P37108;SRP14_HUMAN' -> 'P37108')
+    direct_mapping_dict = {}
+    # Strategy 2: Gene name to protein_id mapping (e.g., 'CDK4' -> 'P11802')
+    gene_to_protein_dict = {}
+    # Strategy 3: Protein_id to full format mapping (e.g., 'P37108' -> 'P37108;SRP14_HUMAN')
+    protein_to_full_dict = {}
+    
     for _, row in mapping_df.iterrows():
-        network_id = row['goncalve_protein_id']
-        proteomics_id = row['protein_id']
-        mapping_dict[network_id] = proteomics_id
+        full_format = row['goncalve_protein_id']
+        protein_id = row['protein_id']
+        gene_name = row['protein_name']
+        
+        # Strategy 1: Full format to protein_id
+        direct_mapping_dict[full_format] = protein_id
+        
+        # Strategy 2: Gene name to protein_id
+        gene_to_protein_dict[gene_name] = protein_id
+        
+        # Strategy 3: Protein_id to full format
+        protein_to_full_dict[protein_id] = full_format
     
     def mapper(network_id):
         """
         Map a network protein ID to a proteomics column name
         
         Args:
-            network_id: Protein ID from network file (e.g., 'Q06323;PSME1_HUMAN')
+            network_id: Protein ID from network file (e.g., 'CDK4' or 'P37108;SRP14_HUMAN')
             
         Returns:
-            str: Mapped protein ID for proteomics data (e.g., 'Q06323')
+            str: Mapped protein ID for proteomics data (e.g., 'P37108;SRP14_HUMAN')
         """
-        # First try direct mapping from the dictionary
-        if network_id in mapping_dict:
-            return mapping_dict[network_id]
+        # Strategy 1: If network_id is already in full format (contains ';' and '_HUMAN'), return as-is
+        if ';' in network_id and '_HUMAN' in network_id:
+            # Check if this full format exists in the mapping file
+            if network_id in direct_mapping_dict:
+                # If it exists in mapping, we could extract the protein_id, but let's keep full format
+                # since proteomics data uses full format
+                return network_id
+            else:
+                # If not in mapping, still return as-is since it's already in the right format
+                return network_id
         
-        # If not found, try extracting UniProt ID (fallback method)
-        if ';' in network_id:
-            uniprot_id = network_id.split(';')[0]
-            return uniprot_id
+        # Strategy 2: If network_id is a gene name, try to map to protein_id then to full format
+        if network_id in gene_to_protein_dict:
+            protein_id = gene_to_protein_dict[network_id]
+            if protein_id in protein_to_full_dict:
+                return protein_to_full_dict[protein_id]
+            return protein_id
+        
+        # Strategy 3: If network_id looks like a UniProt ID, try to map to full format
+        if len(network_id) >= 6 and len(network_id) <= 10:
+            if network_id[0] in ['P', 'Q', 'O', 'A'] and network_id[1:].isdigit():
+                if network_id in protein_to_full_dict:
+                    return protein_to_full_dict[network_id]
+        
+        # Strategy 4: If network_id is in full format but missing _HUMAN, try to complete it
+        if ';' in network_id and '_HUMAN' not in network_id:
+            # Extract the protein part and try to find the full format
+            parts = network_id.split(';')
+            if len(parts) == 2:
+                protein_id = parts[0]
+                if protein_id in protein_to_full_dict:
+                    return protein_to_full_dict[protein_id]
         
         # If no mapping found, return original ID
         return network_id
@@ -122,11 +161,14 @@ def test_mapper():
         print("Mapping file loaded successfully")
         print(f"Mapping dataframe shape: {mapping_df.shape}")
         
-        # Test with sample network IDs
+        # Test with actual network features (CDK4, CDK6) and other formats
         test_network_ids = [
-            'P37108;SRP14_HUMAN',
-            'Q96JP5;ZFP91_HUMAN', 
-            'Q9Y4H2;IRS2_HUMAN'
+            'CDK4',  # Gene name from network
+            'CDK6',  # Gene name from network
+            'P37108;SRP14_HUMAN',  # Full format
+            'Q96JP5;ZFP91_HUMAN',  # Full format
+            'P11802',  # UniProt ID (CDK4)
+            'Q00534'   # UniProt ID (CDK6)
         ]
         
         mapper = create_network_to_proteomics_mapper(mapping_df)
@@ -139,6 +181,19 @@ def test_mapper():
         # Test batch mapping
         mapped_batch = map_network_features(test_network_ids, mapping_df)
         print(f"\nBatch mapping result: {mapped_batch}")
+        
+        # Test with actual proteomics data
+        from DataLink import DataLink
+        import numpy as np
+        data_link = DataLink(path_loader, "data_codes.csv")
+        loading_code = "goncalves-gdsc-2-Palbociclib-LN_IC50-sin"
+        proteomic_feature_data, _ = data_link.get_data_using_code(loading_code)
+        proteomic_feature_data = proteomic_feature_data.select_dtypes(include=[np.number])
+        
+        # Check which mapped features exist in proteomics data
+        available_features = filter_available_features(mapped_batch, proteomic_feature_data.columns)
+        print(f"\nAvailable features in proteomics data: {len(available_features)}")
+        print("Available features:", available_features)
         
         return True
     else:

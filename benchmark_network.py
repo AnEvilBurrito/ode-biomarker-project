@@ -150,6 +150,8 @@ def create_feature_selection_pipeline(
             no_features = False
 
         # 5) Standardization and model training
+        scaler = None  # Initialize scaler to None
+        
         if no_features or len(selected_features) == 0:
             model = DummyRegressor(strategy="mean")
             model_type = "DummyRegressor(mean)"
@@ -189,7 +191,7 @@ def create_feature_selection_pipeline(
             "model": model,
             "model_type": model_type,
             "model_params": model_params,
-            "scaler": scaler if not no_features else None,
+            "scaler": scaler,  # scaler is now properly initialized
             "no_features": no_features,
             "rng": rng,
             "feature_selection_time": feature_selection_time,
@@ -376,8 +378,8 @@ def main():
         # Define the feature selection methods
         feature_selection_methods = {}
         
-        # Joint MRMR + Network methods (3 distances)
-        for distance in [1, 2, 3]:
+        # Joint MRMR + Network methods (focus on distances 2, 3, and 4 - distance 1 has only 2 features)
+        for distance in [2, 3, 4]:
             method_name = f"mrmr_network_d{distance}"
             # Create partial function with network parameters using lambda with default argument
             feature_selection_methods[method_name] = lambda X, y, k, dist=distance: mrmr_network_select_wrapper(
@@ -393,7 +395,7 @@ def main():
         
         print_and_save(f"Benchmarking {len(feature_selection_methods)} methods across {len(feature_set_sizes)} feature sizes and {len(models)} models", report)
         print_and_save(f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}", report)
-        print_and_save("Methods: MRMR+Network (d1, d2, d3), MRMR, ANOVA-filter, and Random Selection (negative control)", report)
+        print_and_save("Methods: MRMR+Network (d2, d3, d4), MRMR, ANOVA-filter, and Random Selection (negative control)", report)
         
         print_and_save("## Powerkit Setup", report)
         # Initialize Powerkit with proteomics data
