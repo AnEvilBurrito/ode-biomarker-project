@@ -39,15 +39,17 @@ def random_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
 
 
 def mrmr_network_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int, 
-                               nth_degree_neighbours: Dict, max_distance: int) -> tuple:
+                               nth_degree_neighbours: list, max_distance: int) -> tuple:
     """
     Joint MRMR + Network feature selection wrapper
     First selects network features, then applies MRMR to select k from network subset
     """
     # Step 1: Get network features within specified distance
-    network_features, _ = select_network_features(
-        X, y, nth_degree_neighbours, max_gene_target_disance=max_distance
-    )
+    # nth_degree_neighbours is a list where index 0 = distance 1, index 1 = distance 2, etc.
+    if max_distance <= len(nth_degree_neighbours):
+        network_features = nth_degree_neighbours[max_distance - 1] if nth_degree_neighbours[max_distance - 1] is not None else []
+    else:
+        network_features = []
     
     # If no network features available, return empty selection
     if len(network_features) == 0:
@@ -330,7 +332,12 @@ def main():
         with open(network_file_path, 'rb') as f:
             nth_degree_neighbours = pickle.load(f)
         
-        print_and_save(f"Network structure loaded. Available distances: {list(nth_degree_neighbours.keys())}", report)
+        print_and_save(f"Network structure loaded. Available distances: {list(range(1, len(nth_degree_neighbours) + 1))}", report)
+        # Print the size of each distance
+        for distance in range(1, len(nth_degree_neighbours) + 1):
+            if distance <= len(nth_degree_neighbours):
+                feature_count = len(nth_degree_neighbours[distance - 1]) if nth_degree_neighbours[distance - 1] is not None else 0
+                print_and_save(f"Distance {distance}: {feature_count} features", report)
         
         print_and_save("## Experiment Setup", report)
         # Setup experiment parameters
@@ -450,10 +457,9 @@ def main():
         # Analyze network feature counts for each distance
         print_and_save("Network Feature Counts by Distance:", report)
         for distance in [1, 2, 3]:
-            network_features, _ = select_network_features(
-                feature_data, label_data, nth_degree_neighbours, max_gene_target_disance=distance
-            )
-            print_and_save(f"Distance {distance}: {len(network_features)} features", report)
+            if distance <= len(nth_degree_neighbours):
+                network_features = nth_degree_neighbours[distance - 1] if nth_degree_neighbours[distance - 1] is not None else []
+                print_and_save(f"Distance {distance}: {len(network_features)} features", report)
         
         print_and_save("## Conclusion", report)
         print_and_save("Feature selection benchmarking with network integration completed successfully!", report)
