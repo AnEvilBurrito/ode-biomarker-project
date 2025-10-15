@@ -29,6 +29,9 @@ from toolkit import (
     Powerkit
 )
 
+# Import protein ID mapper
+from protein_id_mapper import load_protein_mapping, map_network_features, filter_available_features
+
 
 def random_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int) -> tuple:
     """Wrapper function for random feature selection that returns dummy scores"""
@@ -52,6 +55,32 @@ def mrmr_network_select_wrapper(X: pd.DataFrame, y: pd.Series, k: int,
         network_features = []
     
     # If no network features available, return empty selection
+    if len(network_features) == 0:
+        return [], np.array([])
+    
+    # Step 1.5: Map network protein IDs to proteomics-compatible IDs
+    # Load the protein mapping
+    path_loader = PathLoader("data_config.env", "current_user.env")
+    mapping_df = load_protein_mapping(path_loader)
+    
+    if mapping_df is not None:
+        # Map network features to proteomics-compatible IDs
+        mapped_network_features = map_network_features(network_features, mapping_df)
+        
+        # Filter to only include features that exist in the proteomics data
+        available_network_features = filter_available_features(mapped_network_features, X.columns)
+        
+        print(f"Network feature mapping: {len(network_features)} -> {len(available_network_features)} available features")
+        
+        # Use the available mapped features
+        network_features = available_network_features
+    else:
+        # If no mapping available, try to filter network features that exist in X
+        available_network_features = [f for f in network_features if f in X.columns]
+        network_features = available_network_features
+        print(f"No mapping file found. Using direct matching: {len(network_features)} -> {len(available_network_features)} available features")
+    
+    # If no mapped network features available, return empty selection
     if len(network_features) == 0:
         return [], np.array([])
     
@@ -350,12 +379,10 @@ def main():
         # Joint MRMR + Network methods (3 distances)
         for distance in [1, 2, 3]:
             method_name = f"mrmr_network_d{distance}"
-            # Create partial function with network parameters
-            def create_network_method(dist):
-                return lambda X, y, k: mrmr_network_select_wrapper(
-                    X, y, k, nth_degree_neighbours, dist
-                )
-            feature_selection_methods[method_name] = create_network_method(distance)
+            # Create partial function with network parameters using lambda with default argument
+            feature_selection_methods[method_name] = lambda X, y, k, dist=distance: mrmr_network_select_wrapper(
+                X, y, k, nth_degree_neighbours, dist
+            )
         
         # Standalone statistical methods
         feature_selection_methods["mrmr"] = mrmr_select_fcq_fast

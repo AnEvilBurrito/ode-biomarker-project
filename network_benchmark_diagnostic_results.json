@@ -1,0 +1,32 @@
+{
+  "proteomics_columns_sample": [
+    "P37108;SRP14_HUMAN",
+    "Q96JP5;ZFP91_HUMAN",
+    "Q9Y4H2;IRS2_HUMAN",
+    "P36578;RL4_HUMAN",
+    "Q6SPF0;SAMD1_HUMAN",
+    "O76031;CLPX_HUMAN",
+    "Q8WUQ7;CATIN_HUMAN",
+    "A6NIH7;U119B_HUMAN",
+    "Q9BTD8;RBM42_HUMAN",
+    "Q9P258;RCC2_HUMAN",
+    "Q8TCS8;PNPT1_HUMAN",
+    "Q68DK7;MSL1_HUMAN",
+    "Q96L91;EP400_HUMAN",
+    "P52701;MSH6_HUMAN",
+    "P55036;PSMD4_HUMAN",
+    "A1X283;SPD2B_HUMAN",
+    "P05154;IPSP_HUMAN",
+    "Q9BQE4;SELS_HUMAN",
+    "Q8WWH5;TRUB1_HUMAN",
+    "Q96D53;COQ8B_HUMAN"
+  ],
+  "network_ids_sample": [
+    "CDK4",
+    "CDK6"
+  ],
+  "mapping_available": true,
+  "direct_matches": 0,
+  "proposed_solution": "Need custom mapping",
+  "test_mapper_results": {}
+}
