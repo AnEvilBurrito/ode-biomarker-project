@@ -405,104 +405,588 @@ def analyze_time_complexity(df_benchmark, report_file=None):
     return complexity_results, time_by_method_k
 
 # %%
-def plot_time_complexity(df_benchmark, complexity_results, file_save_path, exp_id):
-    """Create time complexity visualization plots"""
+def get_consistent_color_mapping(methods):
+    """Create consistent color mapping for methods across all plots"""
+    standard_colors = {
+        'anova': '#1f77b4',  # Blue
+        'mrmr': '#ff7f0e',   # Orange
+        'mutual': '#2ca02c', # Green
+        'random': '#d62728'  # Red
+    }
     
-    # Set up plotting style
-    plt.style.use('seaborn-v0_8')
-    sns.set_palette("husl")
+    extended_palette = sns.color_palette("husl", max(8, len(methods)))
     
-    # Create subplots
-    fig, axes = plt.subplots(2, 2, figsize=(10, 7))
-    axes = axes.flatten()
+    color_mapping = {}
+    for i, method in enumerate(methods):
+        if method in standard_colors:
+            color_mapping[method] = standard_colors[method]
+        else:
+            color_mapping[method] = extended_palette[i % len(extended_palette)]
     
-    # Plot 1: Time vs k-value for both methods
-    plt.sca(axes[0])
-    for method in df_benchmark['method'].unique():
+    return color_mapping
+
+def get_consistent_marker_mapping(methods):
+    """Create consistent marker mapping for methods across all plots"""
+    base_markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'x', 'd']
+    
+    marker_mapping = {}
+    for i, method in enumerate(methods):
+        marker_mapping[method] = base_markers[i % len(base_markers)]
+    
+    return marker_mapping
+
+def generate_method_labels(methods):
+    """Generate human-readable labels for methods"""
+    label_mapping = {}
+    for method in methods:
+        if method == 'anova':
+            label_mapping[method] = 'ANOVA-Filter'
+        elif method == 'mrmr':
+            label_mapping[method] = 'MRMR'
+        elif method == 'mutual':
+            label_mapping[method] = 'Mutual Information'
+        elif method == 'random':
+            label_mapping[method] = 'Random Selection'
+        else:
+            label_mapping[method] = method.title()  # Default to title case
+    
+    return label_mapping
+
+def plot_time_vs_k_comparison(df_benchmark, file_save_path, exp_id):
+    """Create individual plot: Time vs k-value comparison for all methods"""
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(8, 6))  # Figure size 8x6
+    
+    # Get consistent mappings
+    methods = df_benchmark['method'].unique()
+    color_mapping = get_consistent_color_mapping(methods)
+    marker_mapping = get_consistent_marker_mapping(methods)
+    method_labels = generate_method_labels(methods)
+    
+    # Plot each method
+    for method in methods:
         method_data = df_benchmark[df_benchmark['method'] == method]
         k_values = sorted(method_data['k_value'].unique())
-        mean_times = [method_data[method_data['k_value'] == k]['feature_selection_time'].mean() for k in k_values]
-        std_times = [method_data[method_data['k_value'] == k]['feature_selection_time'].std() for k in k_values]
         
-        plt.errorbar(k_values, mean_times, yerr=std_times, 
-                    label=method.upper(), marker='o', capsize=5, linewidth=2)
-    
-    plt.xlabel('Number of Features Selected (k)')
-    plt.ylabel('Time (seconds)')
-    plt.title('Feature Selection Time vs k-value')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.yscale('log')  # Log scale for better visualization
-    
-    # Plot 2: Speedup ratio comparison between methods
-    plt.sca(axes[1])
-    # Use the first two methods for comparison (or all methods if more than 2)
-    if len(df_benchmark['method'].unique()) >= 2:
-        method1 = df_benchmark['method'].unique()[0]
-        method2 = df_benchmark['method'].unique()[1]
-        
-        method1_data = df_benchmark[df_benchmark['method'] == method1]
-        method2_data = df_benchmark[df_benchmark['method'] == method2]
-        
-        k_values = sorted(method1_data['k_value'].unique())
-        speedup_ratios = []
+        # Skip methods with insufficient data
+        if len(k_values) == 0:
+            continue
+            
+        mean_times = []
+        std_times = []
         
         for k in k_values:
-            method1_time = method1_data[method1_data['k_value'] == k]['feature_selection_time'].mean()
-            method2_time = method2_data[method2_data['k_value'] == k]['feature_selection_time'].mean()
-            if method2_time > 0:  # Avoid division by zero
-                speedup_ratios.append(method1_time / method2_time)
+            k_data = method_data[method_data['k_value'] == k]
+            if len(k_data) > 0:
+                mean_times.append(k_data['feature_selection_time'].mean())
+                std_times.append(k_data['feature_selection_time'].std())
             else:
-                speedup_ratios.append(np.nan)
+                mean_times.append(np.nan)
+                std_times.append(np.nan)
         
-        plt.plot(k_values, speedup_ratios, 'ro-', linewidth=2, markersize=8)
-        plt.xlabel('Number of Features Selected (k)')
-        plt.ylabel(f'Speedup Ratio ({method1.upper()} Time / {method2.upper()} Time)')
-        plt.title(f'Computational Speedup: {method2.upper()} vs {method1.upper()}')
-        plt.grid(True, alpha=0.3)
-        plt.yscale('log')
-    else:
-        plt.text(0.5, 0.5, 'Need at least 2 methods for speedup comparison', 
-                 ha='center', va='center', transform=axes[1].transAxes, fontsize=12)
-        plt.title('Speedup Comparison (Insufficient Methods)')
+        # Filter out NaN values
+        valid_indices = ~np.isnan(mean_times)
+        k_values_valid = [k for i, k in enumerate(k_values) if valid_indices[i]]
+        mean_times_valid = [t for i, t in enumerate(mean_times) if valid_indices[i]]
+        std_times_valid = [t for i, t in enumerate(std_times) if valid_indices[i]]
+        
+        if len(k_values_valid) > 0:
+            ax.errorbar(k_values_valid, mean_times_valid, yerr=std_times_valid,
+                       label=method_labels[method], 
+                       color=color_mapping[method],
+                       marker=marker_mapping[method],
+                       capsize=5, linewidth=2, markersize=10)
     
-    # Plot 3: Time distribution by method
-    plt.sca(axes[2])
-    sns.boxplot(data=df_benchmark, x='method', y='feature_selection_time', ax=axes[2])
-    plt.xlabel('Feature Selection Method')
-    plt.ylabel('Time (seconds)')
-    plt.title('Distribution of Execution Times by Method')
-    plt.yscale('log')
+    ax.set_xlabel('Number of Features Selected (k)', fontsize=14)
+    ax.set_ylabel('Time (seconds)', fontsize=14)
+    ax.set_title('Feature Selection Time vs k-value', fontsize=16, pad=20)
+    ax.legend(fontsize=14)  # Legend size 14
+    ax.grid(True, alpha=0.3)
+    ax.set_yscale('log')
     
-    # Plot 4: Time per feature selected
-    plt.sca(axes[3])
-    for method in df_benchmark['method'].unique():
+    # Increase tick label sizes
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.tick_params(axis='both', which='minor', labelsize=12)
+    
+    # Save the plot
+    plot_filename = f"{file_save_path}computational_cost_time_vs_k_{exp_id}.png"
+    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    return fig
+
+def plot_time_distribution_by_method(df_benchmark, file_save_path, exp_id):
+    """Create individual plot: Time distribution boxplot by method"""
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(8, 6))  # Figure size 8x6
+    
+    # Get consistent mappings
+    methods = df_benchmark['method'].unique()
+    color_mapping = get_consistent_color_mapping(methods)
+    method_labels = generate_method_labels(methods)
+    
+    # Create custom palette for boxplot
+    palette = [color_mapping[method] for method in methods]
+    
+    # Create boxplot with consistent colors
+    sns.boxplot(data=df_benchmark, x='method', y='feature_selection_time', 
+                ax=ax, palette=palette)
+    
+    # Update x-axis labels with proper method labels
+    ax.set_xticklabels([method_labels[method] for method in methods], fontsize=14)
+    
+    ax.set_xlabel('Feature Selection Method', fontsize=14)
+    ax.set_ylabel('Time (seconds)', fontsize=14)
+    ax.set_title('Distribution of Execution Times by Method', fontsize=16, pad=20)
+    ax.set_yscale('log')
+    
+    # Increase tick label sizes
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.tick_params(axis='both', which='minor', labelsize=12)
+    
+    # Save the plot
+    plot_filename = f"{file_save_path}computational_cost_boxplot_{exp_id}.png"
+    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    return fig
+
+def plot_time_efficiency_per_feature(df_benchmark, file_save_path, exp_id):
+    """Create individual plot: Time efficiency per feature selected"""
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(8, 6))  # Figure size 8x6
+    
+    # Get consistent mappings
+    methods = df_benchmark['method'].unique()
+    color_mapping = get_consistent_color_mapping(methods)
+    marker_mapping = get_consistent_marker_mapping(methods)
+    method_labels = generate_method_labels(methods)
+    
+    # Plot each method
+    for method in methods:
         method_data = df_benchmark[df_benchmark['method'] == method]
         k_values = sorted(method_data['k_value'].unique())
         time_per_feature = []
         
         for k in k_values:
             k_data = method_data[method_data['k_value'] == k]
-            mean_time = k_data['feature_selection_time'].mean()
-            time_per_feature.append(mean_time / k)
+            if len(k_data) > 0 and k > 0:  # Avoid division by zero
+                mean_time = k_data['feature_selection_time'].mean()
+                time_per_feature.append(mean_time / k)
+            else:
+                time_per_feature.append(np.nan)
         
-        plt.plot(k_values, time_per_feature, marker='s', label=method.upper(), linewidth=2)
+        # Filter out NaN values
+        valid_indices = ~np.isnan(time_per_feature)
+        k_values_valid = [k for i, k in enumerate(k_values) if valid_indices[i]]
+        time_per_feature_valid = [t for i, t in enumerate(time_per_feature) if valid_indices[i]]
+        
+        if len(k_values_valid) > 0:
+            ax.plot(k_values_valid, time_per_feature_valid, 
+                   label=method_labels[method],
+                   color=color_mapping[method],
+                   marker=marker_mapping[method],
+                   linewidth=2, markersize=10)
     
-    plt.xlabel('Number of Features Selected (k)')
-    plt.ylabel('Time per Feature (seconds)')
-    plt.title('Time Efficiency per Feature Selected')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.yscale('log')
+    ax.set_xlabel('Number of Features Selected (k)', fontsize=14)
+    ax.set_ylabel('Time per Feature (seconds)', fontsize=14)
+    ax.set_title('Time Efficiency per Feature Selected', fontsize=16, pad=20)
+    ax.legend(fontsize=14)  # Legend size 14
+    ax.grid(True, alpha=0.3)
+    ax.set_yscale('log')
     
-    plt.tight_layout()
+    # Increase tick label sizes
+    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.tick_params(axis='both', which='minor', labelsize=12)
     
     # Save the plot
-    plot_filename = f"{file_save_path}computational_cost_analysis_{exp_id}.png"
+    plot_filename = f"{file_save_path}computational_cost_efficiency_{exp_id}.png"
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
     plt.show()
     
     return fig
+
+def plot_pairwise_speedup_comparison(df_benchmark, file_save_path, exp_id):
+    """Create individual plot: Pairwise speedup comparison between all methods"""
+    
+    methods = df_benchmark['method'].unique()
+    method_labels = generate_method_labels(methods)
+    
+    # Only create plot if we have at least 2 methods
+    if len(methods) < 2:
+        print("Insufficient methods for pairwise speedup comparison")
+        return None
+    
+    # Create figure with dynamic layout
+    n_pairs = len(methods) * (len(methods) - 1) // 2
+    max_cols = min(3, n_pairs)
+    rows = (n_pairs + max_cols - 1) // max_cols
+    
+    fig, axes = plt.subplots(rows, max_cols, figsize=(6*max_cols, 5*rows))
+    if n_pairs == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+    
+    pair_index = 0
+    for i, method1 in enumerate(methods):
+        for j, method2 in enumerate(methods):
+            if i < j:
+                ax = axes[pair_index]
+                
+                method1_data = df_benchmark[df_benchmark['method'] == method1]
+                method2_data = df_benchmark[df_benchmark['method'] == method2]
+                
+                # Find common k-values
+                k_values_method1 = set(method1_data['k_value'].unique())
+                k_values_method2 = set(method2_data['k_value'].unique())
+                common_k_values = sorted(k_values_method1.intersection(k_values_method2))
+                
+                speedup_ratios = []
+                
+                for k in common_k_values:
+                    method1_time = method1_data[method1_data['k_value'] == k]['feature_selection_time'].mean()
+                    method2_time = method2_data[method2_data['k_value'] == k]['feature_selection_time'].mean()
+                    if method2_time > 0:  # Avoid division by zero
+                        speedup_ratios.append(method1_time / method2_time)
+                    else:
+                        speedup_ratios.append(np.nan)
+                
+                # Filter out NaN values
+                valid_indices = ~np.isnan(speedup_ratios)
+                k_values_valid = [k for i, k in enumerate(common_k_values) if valid_indices[i]]
+                speedup_ratios_valid = [r for i, r in enumerate(speedup_ratios) if valid_indices[i]]
+                
+                if len(k_values_valid) > 0:
+                    ax.plot(k_values_valid, speedup_ratios_valid, 'ro-', linewidth=2, markersize=10)
+                    ax.set_xlabel('Number of Features Selected (k)', fontsize=14)
+                    ax.set_ylabel(f'Speedup Ratio\n({method_labels[method1]} / {method_labels[method2]})', fontsize=14)
+                    ax.set_title(f'Speedup: {method_labels[method2]} vs {method_labels[method1]}', fontsize=16, pad=20)
+                    ax.grid(True, alpha=0.3)
+                    ax.set_yscale('log')
+                    
+                    # Increase tick label sizes
+                    ax.tick_params(axis='both', which='major', labelsize=14)
+                    ax.tick_params(axis='both', which='minor', labelsize=12)
+                else:
+                    ax.text(0.5, 0.5, 'Insufficient data\nfor comparison', 
+                           ha='center', va='center', transform=ax.transAxes, fontsize=14)
+                    ax.set_title(f'Speedup: {method_labels[method2]} vs {method_labels[method1]}', fontsize=16, pad=20)
+                
+                pair_index += 1
+    
+    # Hide unused subplots
+    for i in range(pair_index, len(axes)):
+        axes[i].set_visible(False)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_filename = f"{file_save_path}computational_cost_speedup_comparison_{exp_id}.png"
+    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    return fig
+
+def plot_performance_vs_time_scatter(df_benchmark, file_save_path, exp_id):
+    """Create scatter plot: Performance vs Computational Time with k-value as confounder"""
+    
+    # Create figure with subplots for better visualization
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))  # Wider figure for two panels
+    
+    # Get consistent mappings
+    methods = df_benchmark['method'].unique()
+    color_mapping = get_consistent_color_mapping(methods)
+    marker_mapping = get_consistent_marker_mapping(methods)
+    method_labels = generate_method_labels(methods)
+    
+    # Get k-values for size mapping
+    k_values = sorted(df_benchmark['k_value'].unique())
+    min_k, max_k = min(k_values), max(k_values)
+    
+    # Panel 1: Scatter plot with k-value as point size
+    for method in methods:
+        method_data = df_benchmark[df_benchmark['method'] == method]
+        
+        if len(method_data) == 0:
+            continue
+        
+        # Map k-value to point size (50 to 200 pixels)
+        sizes = 50 + 150 * (method_data['k_value'] - min_k) / (max_k - min_k) if max_k > min_k else 100
+        
+        scatter = ax1.scatter(method_data['feature_selection_time'], 
+                           method_data['model_performance'],
+                           c=[color_mapping[method]] * len(method_data),
+                           marker=marker_mapping[method],
+                           s=sizes, alpha=0.7, label=method_labels[method])
+    
+    ax1.set_xlabel('Computational Time (seconds)', fontsize=14)
+    ax1.set_ylabel('Model Performance (R²)', fontsize=14)
+    ax1.set_title('Performance vs Time (Size = k-value)', fontsize=16, pad=20)
+    ax1.legend(fontsize=12)
+    ax1.grid(True, alpha=0.3)
+    
+    # Add correlation coefficient
+    correlation = df_benchmark['model_performance'].corr(df_benchmark['feature_selection_time'])
+    ax1.text(0.05, 0.95, f'Correlation: {correlation:.3f}', 
+            transform=ax1.transAxes, fontsize=12, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    # Panel 2: Faceted by k-value for clearer comparison
+    k_values = sorted(df_benchmark['k_value'].unique())
+    max_cols = min(3, len(k_values))
+    rows = (len(k_values) + max_cols - 1) // max_cols
+    
+    # Create subplot grid for k-value faceting
+    fig2, axes = plt.subplots(rows, max_cols, figsize=(6*max_cols, 5*rows))
+    if len(k_values) == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+    
+    for idx, k in enumerate(k_values):
+        ax = axes[idx]
+        k_data = df_benchmark[df_benchmark['k_value'] == k]
+        
+        for method in methods:
+            method_k_data = k_data[k_data['method'] == method]
+            
+            if len(method_k_data) > 0:
+                ax.scatter(method_k_data['feature_selection_time'], 
+                          method_k_data['model_performance'],
+                          c=[color_mapping[method]] * len(method_k_data),
+                          marker=marker_mapping[method],
+                          s=80, alpha=0.7, label=method_labels[method])
+        
+        ax.set_xlabel('Time (seconds)', fontsize=12)
+        ax.set_ylabel('Performance (R²)', fontsize=12)
+        ax.set_title(f'k = {k}', fontsize=14, pad=15)
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='both', which='major', labelsize=11)
+        
+        if idx == 0:
+            ax.legend(fontsize=10)
+    
+    # Hide unused subplots
+    for idx in range(len(k_values), len(axes)):
+        axes[idx].set_visible(False)
+    
+    plt.suptitle('Performance vs Time by k-value', fontsize=16, y=1.02)
+    plt.tight_layout()
+    
+    # Save both plots
+    plot_filename1 = f"{file_save_path}performance_vs_time_scatter_{exp_id}.png"
+    plot_filename2 = f"{file_save_path}performance_vs_time_by_k_{exp_id}.png"
+    
+    plt.figure(fig.number)
+    plt.savefig(plot_filename1, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    plt.figure(fig2.number)
+    plt.savefig(plot_filename2, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    return fig, fig2
+
+def plot_speedup_comparison_matrix(df_benchmark, file_save_path, exp_id):
+    """Create enhanced speedup comparison matrix heatmap (Plot 6)"""
+    
+    methods = df_benchmark['method'].unique()
+    method_labels = generate_method_labels(methods)
+    
+    # Only create plot if we have at least 2 methods
+    if len(methods) < 2:
+        print("Insufficient methods for speedup comparison matrix")
+        return None
+    
+    # Calculate average times for each method with confidence intervals
+    method_stats = {}
+    for method in methods:
+        method_data = df_benchmark[df_benchmark['method'] == method]['feature_selection_time']
+        method_stats[method] = {
+            'mean': method_data.mean(),
+            'std': method_data.std(),
+            'count': len(method_data),
+            'ci_low': method_data.mean() - 1.96 * method_data.std() / np.sqrt(len(method_data)),
+            'ci_high': method_data.mean() + 1.96 * method_data.std() / np.sqrt(len(method_data))
+        }
+    
+    # Create speedup matrix with confidence intervals
+    speedup_matrix = np.zeros((len(methods), len(methods)))
+    speedup_ci_low = np.zeros((len(methods), len(methods)))
+    speedup_ci_high = np.zeros((len(methods), len(methods)))
+    
+    for i, method1 in enumerate(methods):
+        for j, method2 in enumerate(methods):
+            if method_stats[method2]['mean'] > 0:  # Avoid division by zero
+                speedup_matrix[i, j] = method_stats[method1]['mean'] / method_stats[method2]['mean']
+                # Calculate confidence interval for speedup ratio using delta method approximation
+                if method_stats[method1]['count'] > 0 and method_stats[method2]['count'] > 0:
+                    var_ratio = (method_stats[method1]['std']**2 / method_stats[method1]['mean']**2 + 
+                                method_stats[method2]['std']**2 / method_stats[method2]['mean']**2)
+                    se_ratio = speedup_matrix[i, j] * np.sqrt(var_ratio)
+                    speedup_ci_low[i, j] = speedup_matrix[i, j] - 1.96 * se_ratio
+                    speedup_ci_high[i, j] = speedup_matrix[i, j] + 1.96 * se_ratio
+                else:
+                    speedup_ci_low[i, j] = speedup_ci_high[i, j] = np.nan
+            else:
+                speedup_matrix[i, j] = np.nan
+                speedup_ci_low[i, j] = np.nan
+                speedup_ci_high[i, j] = np.nan
+    
+    # Create figure with enhanced layout
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))  # Wider figure for two panels
+    
+    # Panel 1: Enhanced heatmap with statistical significance
+    im = ax1.imshow(speedup_matrix, cmap='RdYlGn_r', aspect='auto', vmin=0.5, vmax=2.0)
+    
+    # Set labels with better formatting
+    ax1.set_xticks(np.arange(len(methods)))
+    ax1.set_yticks(np.arange(len(methods)))
+    ax1.set_xticklabels([method_labels[method] for method in methods], fontsize=16)
+    ax1.set_yticklabels([method_labels[method] for method in methods], fontsize=16)
+    
+    # Rotate x labels for better readability
+    plt.setp(ax1.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+    
+    # Add enhanced text annotations with confidence intervals
+    for i in range(len(methods)):
+        for j in range(len(methods)):
+            if not np.isnan(speedup_matrix[i, j]):
+                # Determine if speedup is statistically significant (CI doesn't include 1)
+                is_significant = (speedup_ci_low[i, j] > 1.0 or speedup_ci_high[i, j] < 1.0) if not np.isnan(speedup_ci_low[i, j]) else False
+                
+                text_color = "white" if (speedup_matrix[i, j] < 0.8 or speedup_matrix[i, j] > 1.2) else "black"
+                font_weight = 'bold' if is_significant else 'normal'
+                
+                annotation = f'{speedup_matrix[i, j]:.2f}x'
+                
+                ax1.text(j, i, annotation,
+                        ha="center", va="center", color=text_color, fontsize=14,
+                        fontweight=font_weight, linespacing=1.2)
+    
+    ax1.set_xlabel('Compared Method', fontsize=18)
+    ax1.set_ylabel('Reference Method', fontsize=18)
+    ax1.set_title('Speedup Comparison Matrix\n(Reference Time / Compared Time)', fontsize=16, pad=20)
+    
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax1)
+    cbar.set_label('Speedup Ratio', fontsize=20)
+    
+    # Panel 2: Method performance summary
+    method_means = [method_stats[method]['mean'] for method in methods]
+    method_stds = [method_stats[method]['std'] for method in methods]
+    
+    bars = ax2.bar(range(len(methods)), method_means, yerr=method_stds, 
+                   capsize=5, alpha=0.7, color=[get_consistent_color_mapping(methods)[method] for method in methods])
+    
+    ax2.set_xticks(range(len(methods)))
+    ax2.set_xticklabels([method_labels[method] for method in methods], fontsize=16, rotation=45)
+    ax2.set_ylabel('Average Time (seconds)', fontsize=20)
+    ax2.set_title('Method Performance Summary', fontsize=20, pad=20)
+    ax2.set_yscale('log')
+    ax2.grid(True, alpha=0.3, axis='y')
+    
+    # Add value labels on bars
+    for bar, mean in zip(bars, method_means):
+        height = bar.get_height()
+        ax2.text(bar.get_x() + bar.get_width()/2., height * 1.02,
+                f'{mean:.3f}s', ha='center', va='bottom', fontsize=14)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_filename = f"{file_save_path}speedup_comparison_matrix_{exp_id}.png"
+    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    return fig
+
+def plot_time_vs_performance_by_k(df_benchmark, file_save_path, exp_id):
+    """Create time vs performance analysis by k-value (Plot 8)"""
+    
+    # Create figure with dynamic layout based on number of k-values
+    k_values = sorted(df_benchmark['k_value'].unique())
+    max_cols = min(3, len(k_values))
+    rows = (len(k_values) + max_cols - 1) // max_cols
+    
+    fig, axes = plt.subplots(rows, max_cols, figsize=(6*max_cols, 5*rows))
+    if len(k_values) == 1:
+        axes = np.array([axes])
+    axes = axes.flatten()
+    
+    # Get consistent mappings
+    methods = df_benchmark['method'].unique()
+    color_mapping = get_consistent_color_mapping(methods)
+    marker_mapping = get_consistent_marker_mapping(methods)
+    method_labels = generate_method_labels(methods)
+    
+    for idx, k in enumerate(k_values):
+        ax = axes[idx]
+        k_data = df_benchmark[df_benchmark['k_value'] == k]
+        
+        # Plot each method for this k-value
+        for method in methods:
+            method_k_data = k_data[k_data['method'] == method]
+            
+            if len(method_k_data) > 0:
+                # Calculate mean time and performance for this method at this k
+                mean_time = method_k_data['feature_selection_time'].mean()
+                mean_performance = method_k_data['model_performance'].mean()
+                std_time = method_k_data['feature_selection_time'].std()
+                std_performance = method_k_data['model_performance'].std()
+                
+                ax.errorbar(mean_time, mean_performance,
+                          xerr=std_time, yerr=std_performance,
+                          label=method_labels[method],
+                          color=color_mapping[method],
+                          marker=marker_mapping[method],
+                          capsize=5, linewidth=2, markersize=8, alpha=0.8)
+        
+        ax.set_xlabel('Time (seconds)', fontsize=12)
+        ax.set_ylabel('Performance (R²)', fontsize=12)
+        ax.set_title(f'k = {k}', fontsize=14, pad=15)
+        ax.grid(True, alpha=0.3)
+        
+        # Increase tick label sizes
+        ax.tick_params(axis='both', which='major', labelsize=11)
+        ax.tick_params(axis='both', which='minor', labelsize=9)
+        
+        # Add legend only to first subplot to avoid duplication
+        if idx == 0:
+            ax.legend(fontsize=10)
+    
+    # Hide unused subplots
+    for idx in range(len(k_values), len(axes)):
+        axes[idx].set_visible(False)
+    
+    plt.suptitle('Time vs Performance by k-value', fontsize=16, y=1.02)
+    plt.tight_layout()
+    
+    # Save the plot
+    plot_filename = f"{file_save_path}time_vs_performance_by_k_{exp_id}.png"
+    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    return fig
+
+def create_computational_cost_visualizations(df_benchmark, file_save_path, exp_id):
+    """Create all individual computational cost visualizations"""
+    
+    print("Creating individual computational cost visualizations...")
+    
+    # Create each plot individually
+    plot_time_vs_k_comparison(df_benchmark, file_save_path, exp_id)
+    plot_time_distribution_by_method(df_benchmark, file_save_path, exp_id)
+    plot_time_efficiency_per_feature(df_benchmark, file_save_path, exp_id)
+    plot_pairwise_speedup_comparison(df_benchmark, file_save_path, exp_id)
+    
+    # Create the two new requested plots (removed the last one)
+    plot_performance_vs_time_scatter(df_benchmark, file_save_path, exp_id)
+    plot_speedup_comparison_matrix(df_benchmark, file_save_path, exp_id)
+    
+    print("All individual visualizations created and saved.")
 
 # %%
 def statistical_comparison(df_benchmark, report_file=None):
@@ -816,7 +1300,7 @@ complexity_results, time_by_method_k = analyze_time_complexity(df_benchmark, pri
 stats_results = statistical_comparison(df_benchmark, print_report_file)
 
 # 3. Generate visualizations
-fig = plot_time_complexity(df_benchmark, complexity_results, file_save_path, exp_id)
+create_computational_cost_visualizations(df_benchmark, file_save_path, exp_id)
 save_and_print("Computational cost visualizations generated and saved.", print_report_file, level="info")
 
 # 4. Practical recommendations
@@ -887,5 +1371,12 @@ print(f"\n{'='*60}")
 print("COMPUTATIONAL COST ANALYSIS COMPLETED")
 print(f"{'='*60}")
 print(f"Report saved to: {print_report_path}")
-print(f"Visualizations saved to: {file_save_path}computational_cost_analysis_{exp_id}.png")
+print(f"Individual visualizations saved to:")
+print(f"  - {file_save_path}computational_cost_time_vs_k_{exp_id}.png")
+print(f"  - {file_save_path}computational_cost_boxplot_{exp_id}.png")
+print(f"  - {file_save_path}computational_cost_efficiency_{exp_id}.png")
+print(f"  - {file_save_path}computational_cost_speedup_comparison_{exp_id}.png")
+print(f"  - {file_save_path}performance_vs_time_scatter_{exp_id}.png")
+print(f"  - {file_save_path}performance_vs_time_by_k_{exp_id}.png")
+print(f"  - {file_save_path}speedup_comparison_matrix_{exp_id}.png")
 print(f"{'='*60}")
