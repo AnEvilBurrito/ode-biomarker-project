@@ -44,12 +44,12 @@ data_link = DataLink(path_loader, "data_codes.csv")
 
 # %%
 folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-exp_id = "v3_rep10"
+exp_id = "v5_network_integration_rep10"
 
-if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}"):
-    os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}")
+if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}"):
+    os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}")
 
-file_save_path = f"{path_loader.get_data_path()}data/results/{folder_name}/"
+file_save_path = f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}/"
 
 # %%
 # Load Proteomics Palbociclib dataset
@@ -341,7 +341,7 @@ import pandas as pd
 import time #noqa: E402
 
 # Create a new report file for capturing print statements
-print_report_path = f"{file_save_path}feature_selection_print_report_{exp_id}.md"
+print_report_path = f"{file_save_path}data_report_{exp_id}.md"
 print_report_file = open(print_report_path, 'w', encoding='utf-8')
 
 # Write header to the print report
@@ -355,6 +355,107 @@ if not os.path.exists(pkl_path):
 
 df_benchmark = pd.read_pickle(pkl_path)
 save_and_print(f"Loaded df_benchmark with shape: {df_benchmark.shape}", print_report_file, level="section")
+
+# %% [markdown]
+# ### Fix Data Structure Issues
+
+# %%
+def parse_condition_column(df_benchmark):
+    """Parse the condition column to extract method, k_value, and model_name correctly"""
+    
+    save_and_print("## Fixing Data Structure Issues", print_report_file, level="section")
+    save_and_print("Parsing condition column to extract correct method, k_value, and model_name", print_report_file, level="info")
+    
+    # Create new columns based on condition parsing
+    parsed_data = []
+    
+    for idx, row in df_benchmark.iterrows():
+        condition = row['condition']
+        
+        # Parse the condition format: {method}_k{value}_{model}
+        # Example: "mrmr_anova_prefilter_k5_KNeighborsRegressor"
+        parts = condition.split('_')
+        
+        # Extract method (everything before the k-value part)
+        method_parts = []
+        k_value = None
+        model_name = None
+        
+        for part in parts:
+            if part.startswith('k'):
+                # Found k-value part, extract numeric value
+                k_value = int(part[1:])  # Remove 'k' prefix and convert to int
+                # Everything before this is the method
+                method = '_'.join(method_parts)
+                # Everything after this is the model
+                model_parts = parts[parts.index(part) + 1:]
+                model_name = '_'.join(model_parts)
+                break
+            else:
+                method_parts.append(part)
+        
+        # If we didn't find a k-value (shouldn't happen with valid data)
+        if k_value is None:
+            save_and_print(f"Warning: Could not parse k-value from condition: {condition}", print_report_file, level="info")
+            method = '_'.join(method_parts[:-1]) if len(method_parts) > 1 else method_parts[0]
+            model_name = parts[-1] if parts else 'unknown'
+            k_value = 0
+        
+        parsed_data.append({
+            'condition': condition,
+            'parsed_method': method,
+            'parsed_k_value': k_value,
+            'parsed_model_name': model_name
+        })
+    
+    # Create a DataFrame with parsed values
+    parsed_df = pd.DataFrame(parsed_data)
+    
+    # Compare with existing columns
+    save_and_print("### Comparison of Original vs Parsed Values", print_report_file, level="subsection")
+    
+    # Check method consistency
+    method_mismatch = df_benchmark['method'] != parsed_df['parsed_method']
+    if method_mismatch.any():
+        save_and_print(f"Method mismatches found: {method_mismatch.sum()}/{len(df_benchmark)}", print_report_file, level="info")
+        for idx in df_benchmark[method_mismatch].index[:5]:  # Show first 5 mismatches
+            save_and_print(f"  Row {idx}: Original='{df_benchmark.loc[idx, 'method']}', Parsed='{parsed_df.loc[idx, 'parsed_method']}'", 
+                          print_report_file, level="info")
+    
+    # Check k_value consistency
+    k_mismatch = df_benchmark['k_value'] != parsed_df['parsed_k_value']
+    if k_mismatch.any():
+        save_and_print(f"K-value mismatches found: {k_mismatch.sum()}/{len(df_benchmark)}", print_report_file, level="info")
+        for idx in df_benchmark[k_mismatch].index[:5]:
+            save_and_print(f"  Row {idx}: Original={df_benchmark.loc[idx, 'k_value']}, Parsed={parsed_df.loc[idx, 'parsed_k_value']}", 
+                          print_report_file, level="info")
+    
+    # Check model_name consistency
+    model_mismatch = df_benchmark['model_name'] != parsed_df['parsed_model_name']
+    if model_mismatch.any():
+        save_and_print(f"Model name mismatches found: {model_mismatch.sum()}/{len(df_benchmark)}", print_report_file, level="info")
+        for idx in df_benchmark[model_mismatch].index[:5]:
+            save_and_print(f"  Row {idx}: Original='{df_benchmark.loc[idx, 'model_name']}', Parsed='{parsed_df.loc[idx, 'parsed_model_name']}'", 
+                          print_report_file, level="info")
+    
+    # Update the dataframe with parsed values
+    df_benchmark['method'] = parsed_df['parsed_method']
+    df_benchmark['k_value'] = parsed_df['parsed_k_value']
+    df_benchmark['model_name'] = parsed_df['parsed_model_name']
+    
+    save_and_print("Dataframe columns updated with correctly parsed values", print_report_file, level="info")
+    
+    # Show unique values after parsing
+    save_and_print("### Unique Values After Parsing", print_report_file, level="subsection")
+    save_and_print(f"Methods: {df_benchmark['method'].unique()}", print_report_file, level="info")
+    save_and_print(f"K-values: {sorted(df_benchmark['k_value'].unique())}", print_report_file, level="info")
+    save_and_print(f"Models: {df_benchmark['model_name'].unique()}", print_report_file, level="info")
+    
+    return df_benchmark
+
+# Apply the parsing fix
+df_benchmark = parse_condition_column(df_benchmark)
+
 # Display first rows (works in notebook)
 try:
     from IPython.display import display
@@ -366,16 +467,62 @@ except Exception:
 # Re-define variables that might be needed in the loaded section
 # Use actual k-values present in the data instead of predefined list
 feature_set_sizes = sorted(df_benchmark['k_value'].unique())
-models = ["KNeighborsRegressor", "LinearRegression", "SVR"]
-method_labels = {
-    'anova': 'ANOVA-Filter',
-    'mrmr': 'MRMR', 
-    'mutual': 'Mutual Information',
-    'random': 'Random Selection'
-}
-
 print(f"Actual k-values present in data: {feature_set_sizes}")
 
+# %% [markdown]
+# ## Dataset Exploration - df_benchmark
 
+# %%
+# Basic Dataset Overview
+save_and_print("## Basic Dataset Overview", print_report_file, level="section")
 
+# Shape and memory usage
+save_and_print(f"Dataset shape: {df_benchmark.shape} (rows × columns)", print_report_file, level="info")
+save_and_print(f"Memory usage: {df_benchmark.memory_usage(deep=True).sum() / 1024**2:.2f} MB", print_report_file, level="info")
 
+# Column names and data types
+save_and_print("### Column Information", print_report_file, level="subsection")
+column_info = df_benchmark.dtypes.reset_index()
+column_info.columns = ['Column', 'Data Type']
+save_and_print(column_info.to_string(index=False), print_report_file, level="info")
+
+# Missing values analysis
+save_and_print("### Missing Values Analysis", print_report_file, level="subsection")
+missing_values = df_benchmark.isnull().sum()
+missing_percentage = (missing_values / len(df_benchmark)) * 100
+missing_df = pd.DataFrame({
+    'Column': missing_values.index,
+    'Missing Count': missing_values.values,
+    'Missing Percentage': missing_percentage.values
+})
+save_and_print(missing_df.to_string(index=False), print_report_file, level="info")
+
+# %%
+# Additional Key Insights
+save_and_print("## Additional Key Insights", print_report_file, level="section")
+
+# Unique combinations of key parameters
+save_and_print("### Unique Combinations of Key Parameters", print_report_file, level="subsection")
+key_params = ['method', 'model_name', 'k_value']
+available_params = [col for col in key_params if col in df_benchmark.columns]
+
+if len(available_params) > 0:
+    unique_combinations = df_benchmark[available_params].drop_duplicates()
+    save_and_print(f"Number of unique combinations: {len(unique_combinations)}", print_report_file, level="info")
+    save_and_print("Unique combinations:", print_report_file, level="info")
+    save_and_print(unique_combinations.to_string(index=False), print_report_file, level="info")
+else:
+    save_and_print("Key parameter columns not found in dataset", print_report_file, level="info")
+
+# Performance metrics summary by method and model
+save_and_print("### Performance Metrics Summary by Method and Model", print_report_file, level="subsection")
+if 'method' in df_benchmark.columns and 'model_name' in df_benchmark.columns and 'model_performance' in df_benchmark.columns:
+    performance_summary = df_benchmark.groupby(['method', 'model_name'])['model_performance'].agg(['mean', 'std', 'min', 'max', 'count'])
+    save_and_print("Performance summary by method and model:", print_report_file, level="info")
+    save_and_print(performance_summary.to_string(), print_report_file, level="info")
+else:
+    save_and_print("Required columns for performance summary not found", print_report_file, level="info")
+
+# Close the report file
+print_report_file.close()
+save_and_print(f"Data report saved to: {print_report_path}", level="info")

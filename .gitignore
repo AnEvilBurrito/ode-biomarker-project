@@ -181,3 +181,4 @@ current_user.env
 drug_response_models.pkl
 project-phdndf/markdown_output/**
 project-phdndf/phdndf_text_only/** 
+thesis-notebooks/result1/sub-section3/data/**
