@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "hdbscan>=0.8.40",
     "importlib-resources==5.12.0",
     "iprogress>=0.4",
     "ipykernel==6.25.1",
