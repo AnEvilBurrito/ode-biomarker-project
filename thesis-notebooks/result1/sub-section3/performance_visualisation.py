@@ -774,6 +774,274 @@ for method in df_benchmark['method'].unique():
     save_and_print(f"  Optimal k range: {method_data.groupby('k_value')['model_performance'].mean().idxmax()} features", print_report_file, level="info")
 
 # %% [markdown]
+# ### Performance vs. Feature Set Size by ML Model (Per Feature Selection Method)
+
+# %%
+# Create publication-quality faceted line plots showing ML model performance for each feature selection method
+save_and_print("Creating faceted line plots showing ML model performance per feature selection method...", print_report_file, level="section")
+
+# Calculate mean and standard deviation for each method, k_value, and model_name
+method_model_k_stats = df_benchmark.groupby(['method', 'k_value', 'model_name'])['model_performance'].agg(['mean', 'std', 'count']).reset_index()
+
+# Create consistent color mapping for ML models
+def get_model_color_mapping(models):
+    """Create consistent color mapping for ML models"""
+    model_colors = {
+        'KNeighborsRegressor': "#542CB0",  # Blue
+        'LinearRegression': "#26ba98",     # Orange
+        'SVR': "#CB452D",                  # Green
+    }
+    
+    extended_palette = sns.color_palette("husl", max(8, len(models)))
+    
+    color_mapping = {}
+    for i, model in enumerate(models):
+        if model in model_colors:
+            color_mapping[model] = model_colors[model]
+        else:
+            color_mapping[model] = extended_palette[i % len(extended_palette)]
+    
+    return color_mapping
+
+def get_model_marker_mapping(models):
+    """Create consistent marker mapping for ML models"""
+    base_markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'x', 'd']
+    
+    marker_mapping = {}
+    for i, model in enumerate(models):
+        marker_mapping[model] = base_markers[i % len(base_markers)]
+    
+    return marker_mapping
+
+# Generate consistent color and marker mappings for models
+model_color_mapping = get_model_color_mapping(models)
+model_marker_mapping = get_model_marker_mapping(models)
+
+# Create model labels for better readability
+model_labels = {
+    'KNeighborsRegressor': 'K-Neighbors',
+    'LinearRegression': 'Linear Regression',
+    'SVR': 'Support Vector Regression'
+}
+
+# Create faceted line plots - one plot per feature selection method
+plt.figure(figsize=(15, 10), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Calculate optimal subplot layout
+n_methods = len(available_methods)
+rows, cols = get_dynamic_subplot_layout(n_methods, max_cols=2)
+fig, axes = plt.subplots(rows, cols, figsize=(5*cols, 4*rows))
+
+# Flatten axes array for easier indexing
+if rows == 1 and cols == 1:
+    axes = np.array([axes])
+axes = axes.flatten()
+
+# Plot each method in its own subplot
+for i, method in enumerate(available_methods):
+    ax = axes[i]
+    method_data = method_model_k_stats[method_model_k_stats['method'] == method]
+    
+    # Plot each model in this method's subplot
+    for j, model in enumerate(models):
+        model_method_data = method_data[method_data['model_name'] == model].sort_values('k_value')
+        
+        if len(model_method_data) > 0:
+            # Plot the mean line
+            ax.plot(model_method_data['k_value'], model_method_data['mean'], 
+                     marker=model_marker_mapping[model], linewidth=2.5, markersize=6,
+                     color=model_color_mapping[model], markeredgecolor='white', markeredgewidth=1,
+                     label=model_labels.get(model, model))
+            
+            # Add standard deviation bands (shaded area)
+            ax.fill_between(model_method_data['k_value'],
+                            model_method_data['mean'] - model_method_data['std'],
+                            model_method_data['mean'] + model_method_data['std'],
+                            alpha=0.15, color=model_color_mapping[model])
+    
+    ax.set_title(f'{method_labels.get(method, method)}', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Number of Features Selected (k)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Mean R² Score', fontsize=12, fontweight='bold')
+    ax.set_xscale('log')
+    ax.set_xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=10)
+    ax.tick_params(axis='y', labelsize=10)
+    ax.grid(True, alpha=0.2, linestyle='--')
+    ax.legend(fontsize=10, framealpha=0.9)
+
+# Hide any unused subplots
+for i in range(len(available_methods), len(axes)):
+    axes[i].set_visible(False)
+
+plt.suptitle('ML Model Performance vs. k Value by Feature Selection Method', 
+             fontsize=16, fontweight='bold', y=0.98)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}performance_vs_k_by_model_per_method_{exp_id}.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+save_and_print("Created faceted line plots showing ML model performance for each feature selection method", print_report_file, level="info")
+
+# %%
+# Create publication-quality faceted line plots without standard error bands (cleaner visualization)
+save_and_print("Creating faceted line plots without standard error bands (cleaner visualization)...", print_report_file, level="section")
+
+# Create faceted line plots without error bands - one plot per feature selection method
+plt.figure(figsize=(15, 10), dpi=300)
+plt.rcParams['font.family'] = 'sans'
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.linewidth'] = 1.2
+
+# Calculate optimal subplot layout
+n_methods = len(available_methods)
+rows, cols = get_dynamic_subplot_layout(n_methods, max_cols=2)
+fig, axes = plt.subplots(rows, cols, figsize=(5*cols, 4*rows))
+
+# Flatten axes array for easier indexing
+if rows == 1 and cols == 1:
+    axes = np.array([axes])
+axes = axes.flatten()
+
+# Plot each method in its own subplot (without error bands)
+for i, method in enumerate(available_methods):
+    ax = axes[i]
+    method_data = method_model_k_stats[method_model_k_stats['method'] == method]
+    
+    # Plot each model in this method's subplot (lines only, no error bands)
+    for j, model in enumerate(models):
+        model_method_data = method_data[method_data['model_name'] == model].sort_values('k_value')
+        
+        if len(model_method_data) > 0:
+            # Plot the mean line only (no error bands)
+            ax.plot(model_method_data['k_value'], model_method_data['mean'], 
+                     marker=model_marker_mapping[model], linewidth=2.5, markersize=6,
+                     color=model_color_mapping[model], markeredgecolor='white', markeredgewidth=1,
+                     label=model_labels.get(model, model))
+    
+    ax.set_title(f'{method_labels.get(method, method)}', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Number of Features Selected (k)', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Mean R² Score', fontsize=12, fontweight='bold')
+    ax.set_xscale('log')
+    ax.set_xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=10)
+    ax.tick_params(axis='y', labelsize=10)
+    ax.grid(True, alpha=0.2, linestyle='--')
+    ax.legend(fontsize=10, framealpha=0.9)
+
+# Hide any unused subplots
+for i in range(len(available_methods), len(axes)):
+    axes[i].set_visible(False)
+
+plt.suptitle('ML Model Performance vs. k Value by Feature Selection Method (Lines Only)', 
+             fontsize=16, fontweight='bold', y=0.98)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}performance_vs_k_by_model_per_method_lines_only_{exp_id}.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+save_and_print("Created faceted line plots without standard error bands", print_report_file, level="info")
+
+# %%
+# Create individual plots for each method for better clarity
+save_and_print("Creating individual plots for each feature selection method...", print_report_file, level="subsection")
+
+for method in available_methods:
+    plt.figure(figsize=(8, 6), dpi=300)
+    plt.rcParams['font.family'] = 'sans'
+    plt.rcParams['font.size'] = 12
+    plt.rcParams['axes.linewidth'] = 1.2
+    
+    method_data = method_model_k_stats[method_model_k_stats['method'] == method]
+    
+    # Plot each model for this method
+    for model in models:
+        model_method_data = method_data[method_data['model_name'] == model].sort_values('k_value')
+        
+        if len(model_method_data) > 0:
+            plt.plot(model_method_data['k_value'], model_method_data['mean'], 
+                     marker=model_marker_mapping[model], linewidth=2.5, markersize=8,
+                     color=model_color_mapping[model], markeredgecolor='white', markeredgewidth=1,
+                     label=model_labels.get(model, model))
+            
+            # Add standard deviation bands
+            plt.fill_between(model_method_data['k_value'],
+                            model_method_data['mean'] - model_method_data['std'],
+                            model_method_data['mean'] + model_method_data['std'],
+                            alpha=0.15, color=model_color_mapping[model])
+    
+    plt.title(f'ML Model Performance vs. k Value: {method_labels.get(method, method)}', 
+              fontsize=16, fontweight='bold', pad=20)
+    plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+    plt.ylabel('Mean R² Score ± Std. Dev.', fontsize=14, fontweight='bold')
+    plt.xscale('log')
+    plt.xticks(feature_set_sizes_viz, feature_set_sizes_viz, fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.grid(True, alpha=0.2, linestyle='--')
+    plt.legend(title='ML Model', fontsize=11, framealpha=0.9)
+    plt.tight_layout()
+    
+    # Save individual plot
+    method_safe_name = method.replace(' ', '_').lower()
+    plt.savefig(f"{file_save_path}performance_vs_k_models_{method_safe_name}_{exp_id}.png", dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    save_and_print(f"Created individual plot for {method_labels.get(method, method)}", print_report_file, level="info")
+
+# %%
+# Statistical analysis of model performance differences within each method
+save_and_print("Statistical Analysis: Model Performance Differences Within Each Method", print_report_file, level="section")
+
+for method in available_methods:
+    method_data = df_benchmark[df_benchmark['method'] == method]
+    
+    save_and_print(f"\n{method_labels.get(method, method)}:", print_report_file, level="subsection")
+    
+    # Calculate mean performance for each model within this method
+    model_performance = method_data.groupby('model_name')['model_performance'].agg(['mean', 'std', 'count']).round(4)
+    save_and_print("Mean performance by model:", print_report_file, level="info")
+    save_and_print(model_performance.to_string(), print_report_file, level="info")
+    
+    # Find best performing model for this method
+    best_model = model_performance['mean'].idxmax()
+    best_performance = model_performance.loc[best_model, 'mean']
+    save_and_print(f"Best performing model: {model_labels.get(best_model, best_model)} (R² = {best_performance:.4f})", print_report_file, level="info")
+    
+    # Calculate performance range
+    performance_range = model_performance['mean'].max() - model_performance['mean'].min()
+    save_and_print(f"Performance range across models: {performance_range:.4f}", print_report_file, level="info")
+
+# %%
+# Create summary table comparing model performance across methods
+save_and_print("Summary: Model Performance Comparison Across Methods", print_report_file, level="section")
+
+# Create a comprehensive summary table
+summary_data = []
+for method in available_methods:
+    for model in models:
+        method_model_data = df_benchmark[(df_benchmark['method'] == method) & (df_benchmark['model_name'] == model)]
+        
+        if len(method_model_data) > 0:
+            mean_perf = method_model_data['model_performance'].mean()
+            std_perf = method_model_data['model_performance'].std()
+            n_runs = len(method_model_data)
+            
+            summary_data.append({
+                'Method': method_labels.get(method, method),
+                'Model': model_labels.get(model, model),
+                'Mean R²': round(mean_perf, 4),
+                'Std Dev': round(std_perf, 4),
+                'N Runs': n_runs
+            })
+
+summary_df = pd.DataFrame(summary_data)
+save_and_print("Comprehensive performance summary:", print_report_file, level="info")
+save_and_print(summary_df.to_string(index=False), print_report_file, level="info")
+
+# Create a pivot table for easier comparison
+pivot_table = summary_df.pivot_table(index='Method', columns='Model', values='Mean R²', aggfunc='first')
+save_and_print("\nPivot table (Mean R² by Method and Model):", print_report_file, level="info")
+save_and_print(pivot_table.to_string(), print_report_file, level="info")
+
+# %% [markdown]
 # ### Performance vs. Feature Set Size (k value) - Excluding Specific k Values
 
 # %%
