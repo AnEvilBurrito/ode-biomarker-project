@@ -308,7 +308,7 @@ def main():
     
     # Setup experiment parameters
     folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-    exp_id = "v5_network_integration"
+    exp_id = "v5_network_integration_rep10"
     
     # Create results directory
     if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}"):
@@ -402,7 +402,7 @@ def main():
         pk = Powerkit(feature_data, label_data)
         
         # Register all conditions (method × size × model combinations)
-        rngs = np.random.RandomState(42).randint(0, 100000, size=1)  # Single run for batch execution
+        rngs = np.random.RandomState(42).randint(0, 100000, size=10)  # Single run for batch execution
         
         start_time = time.time()
         

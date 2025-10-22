@@ -380,7 +380,7 @@ def main():
         pk = Powerkit(feature_data, label_data)
         
         # Register all conditions (method × size × model combinations)
-        rngs = np.random.RandomState(42).randint(0, 100000, size=1)  # Single run for batch execution
+        rngs = np.random.RandomState(42).randint(0, 100000, size=10)  # Single run for batch execution
         
         start_time = time.time()
         
