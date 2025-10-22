@@ -78,6 +78,12 @@ label_data = proteomic_label_data.loc[common_indices]
 print(f"Final aligned dataset shape: {feature_data.shape}")
 print(f"Final aligned label shape: {label_data.shape}")
 
+# %%
+
+feature_data_dynamic, label_data_dynamic = data_link.get_data_using_code('generic-gdsc-1-FGFR_0939-LN_IC50-fgfr4_ccle_dynamic_features-true-Row')
+print(f"Dynamic dataset shape: {feature_data_dynamic.shape}")
+print(f"Dynamic label shape: {label_data_dynamic.shape}")
+
 # %% [markdown]
 # ## Functions
 
