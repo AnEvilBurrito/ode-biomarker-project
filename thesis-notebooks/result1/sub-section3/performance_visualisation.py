@@ -44,7 +44,7 @@ data_link = DataLink(path_loader, "data_codes.csv")
 
 # %%
 folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-exp_id = "v5_network_integration_rep10"
+exp_id = "v6_network_vs_random_control"
 
 if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}"):
     os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}")
@@ -1227,102 +1227,6 @@ for method, freq in method_feature_freq.items():
     save_and_print(f"\n{method_labels.get(method, method)}:", print_report_file, level="subsection")
     save_and_print(freq.head(10).to_string(), print_report_file, level="info")
 
-# %%
-# Create publication-quality faceted bar plots by method
-fig, axes = plt.subplots(2, 2, figsize=(16, 12), dpi=300)
-plt.rcParams['font.family'] = 'sans'
-plt.rcParams['font.size'] = 10
-plt.rcParams['axes.linewidth'] = 1.2
-
-# Use consistent colors for faceted bar plots
-for i, method in enumerate(available_methods):
-    ax = axes[i//2, i%2]
-    top_method_features = method_feature_freq[method].head(10)
-    
-    bars = ax.bar(range(len(top_method_features)), top_method_features.values,
-                  color=color_mapping[method], alpha=0.8, edgecolor='black', linewidth=1)
-    
-    ax.set_title(f'{method_labels.get(method, method)}', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Feature', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Selection Frequency', fontsize=12, fontweight='bold')
-    ax.set_xticks(range(len(top_method_features)))
-    ax.set_xticklabels(top_method_features.index, rotation=45, ha='right', fontsize=9)
-    ax.tick_params(axis='y', labelsize=10)
-    ax.grid(axis='y', alpha=0.2, linestyle='--')
-    
-    # Add value labels on bars
-    for j, bar in enumerate(bars):
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
-                f'{height}', ha='center', va='bottom', fontsize=9, fontweight='bold')
-
-plt.suptitle('Top 10 Most Frequently Selected Features by Method', 
-             fontsize=16, fontweight='bold', y=0.98)
-plt.tight_layout()
-plt.savefig(f"{file_save_path}top_features_by_method_{exp_id}.png", dpi=300, bbox_inches='tight')
-plt.show()
-
-# %%
-# Create publication-quality heatmap showing feature selection frequency by method
-plt.figure(figsize=(10, 7), dpi=300)
-plt.rcParams['font.family'] = 'sans'
-plt.rcParams['font.size'] = 10
-plt.rcParams['axes.linewidth'] = 1.2
-
-# Get top 30 features overall
-top_30_features = feature_frequency.head(30).index
-
-# Create frequency matrix for heatmap
-freq_matrix = []
-for feature in top_30_features:
-    row = []
-    for method in available_methods:
-        if feature in method_feature_freq[method]:
-            row.append(method_feature_freq[method][feature])
-        else:
-            row.append(0)
-    freq_matrix.append(row)
-
-freq_df = pd.DataFrame(freq_matrix, index=top_30_features, 
-                       columns=[method_labels.get(m, m) for m in available_methods])
-
-# Create heatmap
-sns.heatmap(freq_df, annot=True, fmt='d', cmap='YlOrRd', 
-            cbar_kws={'label': 'Selection Frequency'}, 
-            linewidths=0.5, linecolor='white')
-plt.title('Feature Selection Frequency by Method (Top 30 Features)', 
-          fontsize=16, fontweight='bold', pad=20)
-plt.xlabel('Feature Selection Method', fontsize=14, fontweight='bold')
-plt.ylabel('Feature', fontsize=14, fontweight='bold')
-plt.tight_layout()
-plt.savefig(f"{file_save_path}feature_selection_heatmap_{exp_id}.png", dpi=300, bbox_inches='tight')
-plt.show()
-
-# %%
-# Summary statistics for feature selection analysis
-save_and_print("Feature Selection Analysis Summary:", print_report_file, level="section")
-save_and_print(f"Total feature selection events: {len(all_selected_features)}", print_report_file, level="info")
-save_and_print(f"Unique features selected: {len(feature_frequency)}", print_report_file, level="info")
-save_and_print(f"Average selections per feature: {len(all_selected_features) / len(feature_frequency):.1f}", print_report_file, level="info")
-
-# Method-specific statistics
-save_and_print("Method-specific statistics:", print_report_file, level="subsection")
-for method in available_methods:
-    method_selections = sum(len(row['selected_features']) for idx, row in df_benchmark[df_benchmark['method'] == method].iterrows() 
-                           if isinstance(row['selected_features'], list))
-    unique_features = len(method_feature_freq[method])
-    avg_selections = method_selections / unique_features if unique_features > 0 else 0
-    
-    save_and_print(f"\n{method_labels.get(method, method)}:", print_report_file, level="info")
-    save_and_print(f"  Total selections: {method_selections}", print_report_file, level="info")
-    save_and_print(f"  Unique features: {unique_features}", print_report_file, level="info")
-    save_and_print(f"  Average selections per feature: {avg_selections:.1f}", print_report_file, level="info")
-    save_and_print(f"  Most frequent feature: {method_feature_freq[method].index[0]} ({method_feature_freq[method].iloc[0]} selections)", print_report_file, level="info")
-
-# Close the print report file
-print_report_file.close()
-print(f"Print report saved to: {print_report_path}")
-
 # %% [markdown]
 # ### Feature Selection Stability Analysis (Intra-Method Jaccard Similarity)
 
@@ -1590,6 +1494,347 @@ stability_ranking.sort(key=lambda x: x[1], reverse=True)
 save_and_print("Stability Ranking (Highest to Lowest):", print_report_file, level="subsection")
 for i, (method, stability) in enumerate(stability_ranking, 1):
     save_and_print(f"{i}. {method_labels.get(method, method)}: {stability:.3f}", print_report_file, level="info")
+
+# %% [markdown]
+# ### Pairwise Significance Testing Between Feature Selection Methods
+
+# %%
+# Re-open the print report file for pairwise testing
+print_report_file = open(print_report_path, 'a', encoding='utf-8')
+
+save_and_print("## Pairwise Significance Testing Between Feature Selection Methods", print_report_file, level="section")
+save_and_print("Performing paired t-tests for each k-value group separately...", print_report_file, level="info")
+
+from scipy.stats import ttest_rel
+
+def perform_pairwise_tests_by_k(df, methods, method_labels, alpha=0.05):
+    """
+    Perform pairwise paired t-tests between feature selection methods for each k-value group.
+    
+    Args:
+        df: DataFrame with benchmark results
+        methods: List of feature selection methods
+        method_labels: Dictionary mapping method names to labels
+        alpha: Significance level
+    
+    Returns:
+        Dictionary with results for each k-value
+    """
+    results_by_k = {}
+    
+    for k_value in feature_set_sizes:
+        save_and_print(f"\n### k={k_value} Pairwise Comparisons", print_report_file, level="subsection")
+        
+        k_data = df[df['k_value'] == k_value]
+        
+        # Group by (rng, model_name) to create paired observations
+        paired_groups = k_data.groupby(['rng', 'model_name'])
+        
+        # Create performance matrices for paired comparisons
+        performance_matrix = {}
+        for method in methods:
+            performance_matrix[method] = []
+        
+        # Extract paired performance values
+        for (rng, model), group in paired_groups:
+            for method in methods:
+                method_perf = group[group['method'] == method]['model_performance']
+                if len(method_perf) > 0:
+                    performance_matrix[method].append(method_perf.iloc[0])
+        
+        # Ensure all methods have the same number of observations
+        min_obs = min(len(performance_matrix[method]) for method in methods if len(performance_matrix[method]) > 0)
+        
+        if min_obs < 2:
+            save_and_print(f"  Insufficient paired observations for k={k_value} (min_obs={min_obs})", print_report_file, level="info")
+            results_by_k[k_value] = None
+            continue
+        
+        # Trim to common observations
+        for method in methods:
+            if len(performance_matrix[method]) > min_obs:
+                performance_matrix[method] = performance_matrix[method][:min_obs]
+        
+        # Perform pairwise comparisons
+        pairwise_results = []
+        n_comparisons = 0
+        
+        for i, method1 in enumerate(methods):
+            for j, method2 in enumerate(methods):
+                if i < j and len(performance_matrix[method1]) > 0 and len(performance_matrix[method2]) > 0:
+                    n_comparisons += 1
+                    
+                    # Extract paired performance values
+                    perf1 = np.array(performance_matrix[method1])
+                    perf2 = np.array(performance_matrix[method2])
+                    
+                    # Calculate mean difference
+                    mean_diff = np.mean(perf1 - perf2)
+                    
+                    # Perform paired t-test
+                    t_stat, p_value = ttest_rel(perf1, perf2)
+                    
+                    # Apply Bonferroni correction
+                    p_value_corrected = min(p_value * n_comparisons, 1.0)
+                    
+                    # Determine significance
+                    significance_raw = "***" if p_value < 0.001 else "**" if p_value < 0.01 else "*" if p_value < 0.05 else "ns"
+                    significance_corrected = "***" if p_value_corrected < 0.001 else "**" if p_value_corrected < 0.01 else "*" if p_value_corrected < 0.05 else "ns"
+                    
+                    pairwise_results.append({
+                        'method1': method1,
+                        'method2': method2,
+                        'mean_diff': mean_diff,
+                        't_stat': t_stat,
+                        'p_value': p_value,
+                        'p_value_corrected': p_value_corrected,
+                        'significance_raw': significance_raw,
+                        'significance_corrected': significance_corrected,
+                        'n_pairs': len(perf1)
+                    })
+        
+        # Sort by absolute mean difference (largest differences first)
+        pairwise_results.sort(key=lambda x: abs(x['mean_diff']), reverse=True)
+        
+        # Display results
+        save_and_print(f"  Number of paired observations: {min_obs}", print_report_file, level="info")
+        save_and_print(f"  Number of pairwise comparisons: {n_comparisons}", print_report_file, level="info")
+        
+        # Create results table
+        results_table = []
+        for result in pairwise_results:
+            method1_label = method_labels.get(result['method1'], result['method1'])
+            method2_label = method_labels.get(result['method2'], result['method2'])
+            
+            results_table.append({
+                'Comparison': f"{method1_label} vs {method2_label}",
+                'Mean Diff': f"{result['mean_diff']:.4f}",
+                't-stat': f"{result['t_stat']:.3f}",
+                'p-value': f"{result['p_value']:.4f}",
+                'p-corrected': f"{result['p_value_corrected']:.4f}",
+                'Sig (raw)': result['significance_raw'],
+                'Sig (corr)': result['significance_corrected'],
+                'N pairs': result['n_pairs']
+            })
+        
+        results_df = pd.DataFrame(results_table)
+        save_and_print("  Pairwise comparison results:", print_report_file, level="info")
+        save_and_print(results_df.to_string(index=False), print_report_file, level="info")
+        
+        # Summary of significant differences
+        significant_raw = [r for r in pairwise_results if r['p_value'] < alpha]
+        significant_corrected = [r for r in pairwise_results if r['p_value_corrected'] < alpha]
+        
+        save_and_print(f"  Significant differences (raw p < {alpha}): {len(significant_raw)}/{n_comparisons}", print_report_file, level="info")
+        save_and_print(f"  Significant differences (Bonferroni-corrected p < {alpha}): {len(significant_corrected)}/{n_comparisons}", print_report_file, level="info")
+        
+        results_by_k[k_value] = {
+            'pairwise_results': pairwise_results,
+            'n_observations': min_obs,
+            'n_comparisons': n_comparisons,
+            'significant_raw': len(significant_raw),
+            'significant_corrected': len(significant_corrected)
+        }
+    
+    return results_by_k
+
+# Perform pairwise testing
+pairwise_results = perform_pairwise_tests_by_k(df_benchmark, available_methods, method_labels)
+
+# %% [markdown]
+# ### Visualization of Pairwise Significance Results
+
+# %%
+# Create visualization of pairwise significance patterns across k-values
+save_and_print("## Visualization of Pairwise Significance Patterns", print_report_file, level="section")
+
+def create_significance_heatmap(pairwise_results, methods, method_labels):
+    """
+    Create heatmap showing significance patterns across k-values and method pairs.
+    """
+    if not pairwise_results:
+        save_and_print("No pairwise results available for visualization", print_report_file, level="info")
+        return
+    
+    # Create method pairs
+    method_pairs = []
+    for i, method1 in enumerate(methods):
+        for j, method2 in enumerate(methods):
+            if i < j:
+                method_pairs.append((method1, method2))
+    
+    # Create significance matrix
+    significance_matrix = []
+    k_values_with_data = [k for k in feature_set_sizes if k in pairwise_results and pairwise_results[k] is not None]
+    
+    for method_pair in method_pairs:
+        row = []
+        for k_value in k_values_with_data:
+            if pairwise_results[k_value]:
+                # Find the result for this method pair
+                pair_result = None
+                for result in pairwise_results[k_value]['pairwise_results']:
+                    if (result['method1'] == method_pair[0] and result['method2'] == method_pair[1]) or \
+                       (result['method1'] == method_pair[1] and result['method2'] == method_pair[0]):
+                        pair_result = result
+                        break
+                
+                if pair_result:
+                    # Use corrected p-value for significance
+                    if pair_result['p_value_corrected'] < 0.001:
+                        row.append(3)  # Highly significant
+                    elif pair_result['p_value_corrected'] < 0.01:
+                        row.append(2)  # Very significant
+                    elif pair_result['p_value_corrected'] < 0.05:
+                        row.append(1)  # Significant
+                    else:
+                        row.append(0)  # Not significant
+                else:
+                    row.append(-1)  # No data
+            else:
+                row.append(-1)  # No data
+        significance_matrix.append(row)
+    
+    # Create DataFrame for heatmap
+    if significance_matrix:
+        heatmap_df = pd.DataFrame(
+            significance_matrix,
+            index=[f"{method_labels.get(pair[0], pair[0])} vs {method_labels.get(pair[1], pair[1])}" 
+                   for pair in method_pairs],
+            columns=k_values_with_data
+        )
+        
+        # Create heatmap
+        plt.figure(figsize=(12, 8), dpi=300)
+        plt.rcParams['font.family'] = 'sans'
+        plt.rcParams['font.size'] = 10
+        plt.rcParams['axes.linewidth'] = 1.2
+        
+        # Custom colormap for significance levels
+        from matplotlib.colors import ListedColormap
+        cmap = ListedColormap(['lightgray', 'lightblue', 'blue', 'darkblue'])
+        
+        # Create masked array for no-data values
+        mask = heatmap_df == -1
+        data_masked = heatmap_df.where(~mask, np.nan)
+        
+        sns.heatmap(data_masked, annot=True, fmt='d', cmap=cmap, 
+                    cbar_kws={'label': 'Significance Level\n(0=ns, 1=p<0.05, 2=p<0.01, 3=p<0.001)'}, 
+                    linewidths=0.5, linecolor='white', vmin=0, vmax=3)
+        
+        plt.title('Pairwise Significance Patterns Across k-values\n(Bonferroni-corrected p-values)', 
+                  fontsize=16, fontweight='bold', pad=20)
+        plt.xlabel('Number of Features Selected (k)', fontsize=14, fontweight='bold')
+        plt.ylabel('Method Comparison', fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        plt.savefig(f"{file_save_path}pairwise_significance_heatmap_{exp_id}.png", dpi=300, bbox_inches='tight')
+        plt.show()
+        
+        save_and_print("Created significance heatmap visualization", print_report_file, level="info")
+    else:
+        save_and_print("Insufficient data for significance heatmap", print_report_file, level="info")
+
+# Create the heatmap
+create_significance_heatmap(pairwise_results, available_methods, method_labels)
+
+# %% [markdown]
+# ### Summary of Pairwise Testing Results
+
+# %%
+# Create summary of pairwise testing results
+save_and_print("## Summary of Pairwise Testing Results", print_report_file, level="section")
+
+def create_pairwise_summary(pairwise_results, methods, method_labels):
+    """
+    Create comprehensive summary of pairwise testing results.
+    """
+    if not pairwise_results:
+        save_and_print("No pairwise results available for summary", print_report_file, level="info")
+        return
+    
+    # Calculate overall performance differences
+    overall_differences = []
+    
+    for i, method1 in enumerate(methods):
+        for j, method2 in enumerate(methods):
+            if i < j:
+                # Aggregate differences across all k-values
+                all_differences = []
+                all_p_values = []
+                
+                for k_value in feature_set_sizes:
+                    if k_value in pairwise_results and pairwise_results[k_value]:
+                        for result in pairwise_results[k_value]['pairwise_results']:
+                            if (result['method1'] == method1 and result['method2'] == method2) or \
+                               (result['method1'] == method2 and result['method2'] == method1):
+                                all_differences.append(result['mean_diff'])
+                                all_p_values.append(result['p_value_corrected'])
+                                break
+                
+                if all_differences:
+                    mean_overall_diff = np.mean(all_differences)
+                    min_p_value = min(all_p_values) if all_p_values else 1.0
+                    
+                    # Determine overall significance
+                    if min_p_value < 0.001:
+                        overall_sig = "***"
+                    elif min_p_value < 0.01:
+                        overall_sig = "**"
+                    elif min_p_value < 0.05:
+                        overall_sig = "*"
+                    else:
+                        overall_sig = "ns"
+                    
+                    overall_differences.append({
+                        'method1': method1,
+                        'method2': method2,
+                        'mean_difference': mean_overall_diff,
+                        'min_p_value': min_p_value,
+                        'significance': overall_sig,
+                        'n_k_values': len(all_differences)
+                    })
+    
+    # Sort by absolute mean difference
+    overall_differences.sort(key=lambda x: abs(x['mean_difference']), reverse=True)
+    
+    # Create summary table
+    summary_table = []
+    for diff in overall_differences:
+        method1_label = method_labels.get(diff['method1'], diff['method1'])
+        method2_label = method_labels.get(diff['method2'], diff['method2'])
+        
+        summary_table.append({
+            'Comparison': f"{method1_label} vs {method2_label}",
+            'Mean Difference': f"{diff['mean_difference']:.4f}",
+            'Min p-value': f"{diff['min_p_value']:.4f}",
+            'Significance': diff['significance'],
+            'k-values': diff['n_k_values']
+        })
+    
+    summary_df = pd.DataFrame(summary_table)
+    save_and_print("Overall performance differences across all k-values:", print_report_file, level="subsection")
+    save_and_print(summary_df.to_string(index=False), print_report_file, level="info")
+    
+    # Identify consistently significant differences
+    consistent_significant = [diff for diff in overall_differences if diff['significance'] != 'ns']
+    
+    if consistent_significant:
+        save_and_print("\nConsistently significant differences:", print_report_file, level="subsection")
+        for diff in consistent_significant:
+            method1_label = method_labels.get(diff['method1'], diff['method1'])
+            method2_label = method_labels.get(diff['method2'], diff['method2'])
+            direction = "better" if diff['mean_difference'] > 0 else "worse"
+            better_method = method1_label if diff['mean_difference'] > 0 else method2_label
+            worse_method = method2_label if diff['mean_difference'] > 0 else method1_label
+            
+            save_and_print(f"  {better_method} is significantly {direction} than {worse_method} "
+                  f"(mean diff: {diff['mean_difference']:.4f}, p < {diff['min_p_value']:.4f})", 
+                  print_report_file, level="info")
+    else:
+        save_and_print("No consistently significant differences found across k-values", print_report_file, level="info")
+
+# Create the summary
+create_pairwise_summary(pairwise_results, available_methods, method_labels)
 
 # Close the print report file
 print_report_file.close()
