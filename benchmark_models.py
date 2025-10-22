@@ -164,12 +164,35 @@ def create_model_selection_pipeline(
             # Use standard hyperparameters for each model
             if model_name == "LinearRegression":
                 model = get_model_from_string("LinearRegression")
-            elif model_name == "RandomForestRegressor":
+            elif model_name == "RandomForestRegressor_config1":
                 model = get_model_from_string("RandomForestRegressor", n_estimators=100, random_state=rng)
+            elif model_name == "RandomForestRegressor_config2":
+                model = get_model_from_string("RandomForestRegressor", 
+                                            n_estimators=200, 
+                                            max_features='sqrt',
+                                            max_depth=10,
+                                            min_samples_split=5,
+                                            min_samples_leaf=3,
+                                            bootstrap=True,
+                                            random_state=rng)
             elif model_name == "KNeighborsRegressor":
                 model = get_model_from_string("KNeighborsRegressor", n_neighbors=5, weights="distance", p=2)
             elif model_name == "SVR":
                 model = get_model_from_string("SVR", kernel="linear", C=1.0)
+            elif model_name == "MLPRegressor_config1":
+                model = get_model_from_string("MLPRegressor", 
+                                            hidden_layer_sizes=(50,), 
+                                            max_iter=1000, 
+                                            activation='relu',
+                                            solver='adam',
+                                            random_state=rng)
+            elif model_name == "MLPRegressor_config2":
+                model = get_model_from_string("MLPRegressor", 
+                                            hidden_layer_sizes=(100, 50), 
+                                            max_iter=2000, 
+                                            activation='relu',
+                                            solver='adam',
+                                            random_state=rng)
             else:
                 raise ValueError(f"Unsupported model: {model_name}")
 
@@ -326,6 +349,9 @@ def main():
         print(message)
         file_handle.write(message + "\n")
     
+    # Start total batch timing
+    total_batch_start = time.time()
+    
     with open(report_file, 'w', encoding='utf-8') as report:
         print_and_save("# Model Selection Benchmarking Report (Fixed Network MRMR d3)", report)
         print_and_save(f"**Generated on:** {time.strftime('%Y-%m-%d %H:%M:%S')}", report)
@@ -376,7 +402,7 @@ def main():
         print_and_save("## Experiment Setup", report)
         # Setup experiment parameters - simplified design
         feature_set_sizes = [100, 500]  # Only two k values as specified
-        models = ["RandomForestRegressor", "LinearRegression", "KNeighborsRegressor", "SVR"]  # Four specified models
+        models = ["RandomForestRegressor_config1", "RandomForestRegressor_config2", "LinearRegression", "KNeighborsRegressor", "SVR", "MLPRegressor_config1", "MLPRegressor_config2"]  # Seven models with configs
         
         # Define the single feature selection method (network MRMR distance 3)
         feature_selection_methods = {}
@@ -391,7 +417,7 @@ def main():
         print_and_save(f"Benchmarking {len(feature_selection_methods)} feature selection method across {len(feature_set_sizes)} feature sizes and {len(models)} models", report)
         print_and_save(f"Total conditions: {len(feature_selection_methods) * len(feature_set_sizes) * len(models)}", report)
         print_and_save("Feature Selection Method: MRMR+Network (distance 3)", report)
-        print_and_save("Models: RandomForest, LinearRegression, KNeighbors, SVR", report)
+        print_and_save("Models: RandomForest (config1: 100 trees), RandomForest (config2: 200 trees, sqrt features, depth=10), LinearRegression, KNeighbors, SVR, MLP (config1: 50 neurons), MLP (config2: 100-50 neurons)", report)
         print_and_save("Feature Set Sizes: 100, 500", report)
         
         print_and_save("## Powerkit Setup", report)
@@ -489,8 +515,16 @@ def main():
             best_performance = k_data["model_performance"].max()
             print_and_save(f"Best model for k={k}: {best_model} (R² = {best_performance:.4f})", report)
         
+        # Calculate total batch time
+        total_batch_time = time.time() - total_batch_start
+        
+        print_and_save("## Total Batch Time", report)
+        print_and_save(f"Total batch execution time: {total_batch_time:.2f} seconds", report)
+        print_and_save(f"Average time per condition: {total_batch_time / len(df_benchmark):.2f} seconds", report)
+        
         print_and_save("## Conclusion", report)
         print_and_save("Model selection benchmarking with fixed network-based feature selection completed successfully!", report)
+        print_and_save(f"Total execution time: {total_batch_time:.2f} seconds", report)
         print_and_save(f"Report saved to: {report_file}", report)
 
 
