@@ -44,7 +44,7 @@ data_link = DataLink(path_loader, "data_codes.csv")
 
 # %%
 folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-exp_id = "v6_network_vs_random_control"
+exp_id = "v1_fixed_network_mrmr_d3"
 
 if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}"):
     os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}")
