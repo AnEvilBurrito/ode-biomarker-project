@@ -199,6 +199,13 @@ save_and_print(f"Methods: {methods}", print_report_file, level="info")
 save_and_print(f"Total runs: {len(df_benchmark)}", print_report_file, level="info")
 
 # %%
+
+# Define publication-quality font sizes with optimized spacing and layout
+publication_font_sizes = {
+    'title': 16, 'axis_label': 14, 'tick': 12, 
+    'value': 10, 'legend': 10, 'annotation': 9
+}
+
 # Create model labels for better readability
 model_labels = {
     'RandomForestRegressor_config1': 'RF Config1 (100 trees)',
@@ -214,11 +221,6 @@ model_labels = {
 method_labels = {
     'mrmr_network_d3': 'MRMR+Network (d3)'
 }
-
-save_and_print("### Model and Method Labels", print_report_file, level="subsection")
-save_and_print("Model labels created for visualization:", print_report_file, level="info")
-for model, label in model_labels.items():
-    save_and_print(f"  {model} -> {label}", print_report_file, level="info")
 
 # %% [markdown]
 # ## Model Performance Comparison Visualizations
@@ -276,22 +278,22 @@ palette = [color_mapping[model] for model in models]
 
 # %%
 # Create publication-quality box plot comparing models across all k-values
-plt.figure(figsize=(12, 6), dpi=300)
+plt.figure(figsize=(10, 5), dpi=300)  # Reduced size for better proportions
 plt.rcParams['font.family'] = 'sans'
-plt.rcParams['font.size'] = 12
+plt.rcParams['font.size'] = publication_font_sizes['tick']
 plt.rcParams['axes.linewidth'] = 1.2
 
 sns.boxplot(data=df_benchmark, x='model_name', y='model_performance', 
             order=models,
-            palette=palette, width=0.6, fliersize=3)
+            palette=palette, width=0.5, fliersize=2)  # Reduced width and fliersize
 plt.title('Model Performance Comparison (All k-values)', 
-          fontsize=16, fontweight='bold', pad=20)
-plt.xlabel('Machine Learning Model', fontsize=14, fontweight='bold')
-plt.ylabel('R² Score', fontsize=14, fontweight='bold')
+          fontsize=publication_font_sizes['title'], fontweight='bold', pad=15)
+plt.xlabel('Machine Learning Model', fontsize=publication_font_sizes['axis_label'], fontweight='bold')
+plt.ylabel('R² Score', fontsize=publication_font_sizes['axis_label'], fontweight='bold')
 plt.xticks(ticks=range(len(models)), 
            labels=[model_labels[m] for m in models],
-           rotation=45, fontsize=12)
-plt.yticks(fontsize=12)
+           rotation=45, fontsize=publication_font_sizes['tick'])
+plt.yticks(fontsize=publication_font_sizes['tick'])
 plt.grid(axis='y', alpha=0.2, linestyle='--')
 plt.tight_layout()
 plt.savefig(f"{file_save_path}model_comparison_boxplot_{exp_id}.png", dpi=300, bbox_inches='tight')
@@ -920,8 +922,8 @@ def create_k_group_bar_plot(df_benchmark, k_value, file_save_path, exp_id, font_
     # Sort by performance for better visualization
     k_stats = k_stats.sort_values('mean', ascending=False)
     
-    # Create publication-quality bar plot with large fonts
-    plt.figure(figsize=(14, 8), dpi=300)
+    # Create publication-quality bar plot with optimized spacing and layout
+    plt.figure(figsize=(10, 6), dpi=300)  # Reduced figure size for better proportions
     plt.rcParams['font.family'] = 'sans'
     plt.rcParams['font.size'] = font_sizes['tick']
     plt.rcParams['axes.linewidth'] = 1.2
@@ -935,12 +937,18 @@ def create_k_group_bar_plot(df_benchmark, k_value, file_save_path, exp_id, font_
             # Use a default color if model not found in mapping
             bar_colors.append('#808080')  # Gray as default
 
-    # Create bars with error bars (95% CI)
+    # Set y-axis limits: limit negative values to -0.1, allow positive values to extend naturally
+    y_min = max(-0.1, k_stats['mean'].min() - 0.05)  # Use max to ensure we don't go below -0.1
+    y_max = max(k_stats['mean'].max() + 0.1, 0.1)  # Ensure at least some positive range
+    
+    # Create bars with error bars (95% CI) - reduced spacing
     x_pos = np.arange(len(k_stats))
+    
+    # Create bars with truncated negative values - reduced width for tighter spacing
     bars = plt.bar(x_pos, k_stats['mean'], 
                    yerr=[k_stats['mean'] - k_stats['ci_lower'], k_stats['ci_upper'] - k_stats['mean']],
-                   capsize=8, alpha=0.8, color=bar_colors, 
-                   edgecolor='black', linewidth=1, width=0.6)
+                   capsize=6, alpha=0.8, color=bar_colors, 
+                   edgecolor='black', linewidth=1, width=0.4)  # Reduced width for tighter spacing
 
     # Apply large font sizes
     plt.title(f'Model Performance at k={k_value} Features', 
@@ -948,16 +956,38 @@ def create_k_group_bar_plot(df_benchmark, k_value, file_save_path, exp_id, font_
     plt.xlabel('Machine Learning Model', fontsize=font_sizes['axis_label'], fontweight='bold')
     plt.ylabel('Mean R² Score ± 95% CI', fontsize=font_sizes['axis_label'], fontweight='bold')
     plt.xticks(x_pos, [model_labels[model] for model in k_stats['model_name']], 
-               rotation=45, fontsize=font_sizes['tick'])
+               rotation=25, fontsize=font_sizes['tick'])
     plt.yticks(fontsize=font_sizes['tick'])
+    
+    # Set y-axis limits to improve readability for negative values
+    plt.ylim(y_min, y_max)
 
-    # Add value labels with large fonts
+    # Smart value labeling: different placement for positive vs negative values
     for i, bar in enumerate(bars):
-        height = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                 f'{height:.3f}', ha='center', va='bottom', 
+        height = k_stats['mean'].iloc[i]
+        actual_height = height  # Store actual height for labeling
+        
+        # For values above -0.1, place label above the bar
+        if height >= -0.1:
+            label_y = height + 0.01
+            va = 'bottom'
+            bbox_style = dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8)
+        else:
+            # For values below -0.1, place label below the truncated bar
+            label_y = -0.1 - 0.02  # Place below the -0.1 limit
+            va = 'top'
+            bbox_style = dict(boxstyle="round,pad=0.2", facecolor="lightcoral", alpha=0.8)
+        
+        plt.text(bar.get_x() + bar.get_width()/2., label_y,
+                 f'{actual_height:.3f}', ha='center', va=va, 
                  fontsize=font_sizes['value'], fontweight='bold',
-                 bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+                 bbox=bbox_style)
+        
+        # Add dashed line indicator for truncated negative bars
+        if height < -0.1:
+            # Draw a dashed line from the truncated bar to indicate continuation
+            plt.plot([bar.get_x() + bar.get_width()/2., bar.get_x() + bar.get_width()/2.], 
+                    [-0.1, height], 'k--', alpha=0.5, linewidth=1)
 
     plt.grid(axis='y', alpha=0.2, linestyle='--')
     plt.tight_layout()
@@ -997,8 +1027,8 @@ def create_k_group_comparison_plot(df_benchmark, k_values, file_save_path, exp_i
     # Combine all k-group data
     comparison_df = pd.concat(k_comparison_data, ignore_index=True)
     
-    # Create publication-quality grouped bar plot
-    plt.figure(figsize=(16, 10), dpi=300)
+    # Create publication-quality grouped bar plot with optimized spacing
+    plt.figure(figsize=(10, 6), dpi=300)  # Reduced figure size for better proportions
     plt.rcParams['font.family'] = 'sans'
     plt.rcParams['font.size'] = font_sizes['tick']
     plt.rcParams['axes.linewidth'] = 1.2
@@ -1006,9 +1036,24 @@ def create_k_group_comparison_plot(df_benchmark, k_values, file_save_path, exp_i
     # Use consistent model ordering (sorted by overall performance)
     model_order = df_benchmark.groupby('model_name')['model_performance'].mean().sort_values(ascending=False).index
     
-    # Create grouped bar positions
-    bar_width = 0.8 / len(k_values)  # Dynamic width based on number of k-values
+    # Create grouped bar positions with reduced spacing
+    bar_width = 0.6 / len(k_values)  # Reduced width for tighter spacing
     x_pos = np.arange(len(model_order))
+    
+    # Calculate y-axis limits for consistent visualization
+    all_means = []
+    for k_value in k_values:
+        k_data = comparison_df[comparison_df['k_value'] == k_value]
+        for model in model_order:
+            model_data = k_data[k_data['model_name'] == model]
+            if len(model_data) > 0:
+                all_means.append(model_data['mean'].iloc[0])
+    
+    if all_means:
+        y_min = max(-0.1, min(all_means) - 0.05)  # Use max to ensure we don't go below -0.1
+        y_max = max(max(all_means) + 0.1, 0.1)  # Ensure at least some positive range
+    else:
+        y_min, y_max = -0.1, 0.1  # Default limits
     
     # Plot bars for each k-value
     for i, k_value in enumerate(k_values):
@@ -1028,6 +1073,29 @@ def create_k_group_comparison_plot(df_benchmark, k_values, file_save_path, exp_i
         bars = plt.bar(x_pos + i * bar_width, k_means, bar_width,
                        color=k_colors[i], alpha=0.8, edgecolor='black', linewidth=1,
                        label=f'k={k_value}')
+        
+        # Add smart value labeling for each bar
+        for j, model in enumerate(model_order):
+            model_data = k_data[k_data['model_name'] == model]
+            if len(model_data) > 0:
+                height = model_data['mean'].iloc[0]
+                actual_height = height
+                
+                # For values above -0.1, place label above the bar
+                if height >= -0.1:
+                    label_y = height + 0.01
+                    va = 'bottom'
+                    bbox_style = dict(boxstyle="round,pad=0.1", facecolor="white", alpha=0.8)
+                else:
+                    # For values below -0.1, place label below the truncated bar
+                    label_y = -0.1 - 0.02
+                    va = 'top'
+                    bbox_style = dict(boxstyle="round,pad=0.1", facecolor="lightcoral", alpha=0.8)
+                
+                plt.text(x_pos[j] + i * bar_width + bar_width/2, label_y,
+                         f'{actual_height:.2f}', ha='center', va=va, 
+                         fontsize=font_sizes['value'] - 2, fontweight='bold',
+                         bbox=bbox_style)
     
     # Apply large font sizes
     plt.title('Model Performance Comparison Across k-Values', 
@@ -1036,10 +1104,12 @@ def create_k_group_comparison_plot(df_benchmark, k_values, file_save_path, exp_i
     plt.ylabel('Mean R² Score', fontsize=font_sizes['axis_label'], fontweight='bold')
     plt.xticks(x_pos + bar_width * (len(k_values) - 1) / 2, 
                [model_labels[model] for model in model_order], 
-               rotation=45, fontsize=font_sizes['tick'])
+               rotation=25, fontsize=font_sizes['tick'])
     plt.yticks(fontsize=font_sizes['tick'])
     plt.legend(title='Number of Features', fontsize=font_sizes['legend'], framealpha=0.9)
     
+    # Set y-axis limits to improve readability for negative values
+    plt.ylim(y_min, y_max)
     plt.grid(axis='y', alpha=0.2, linestyle='--')
     plt.tight_layout()
     
@@ -1051,19 +1121,13 @@ def create_k_group_comparison_plot(df_benchmark, k_values, file_save_path, exp_i
     save_and_print(f"Created k-group comparison plot: {filename}", print_report_file, level="info")
     return comparison_df
 
-# Define large font sizes as requested
-large_font_sizes = {
-    'title': 20, 'axis_label': 16, 'tick': 14, 
-    'value': 14, 'legend': 14, 'annotation': 12
-}
-
 # Create individual k-group bar plots with error handling
 save_and_print("### Individual K-Group Performance Bar Plots", print_report_file, level="subsection")
 k_group_stats = {}
 for k_value in k_values:
     save_and_print(f"Creating visualization for k={k_value}...", print_report_file, level="info")
     try:
-        stats = create_k_group_bar_plot(df_benchmark, k_value, file_save_path, exp_id, large_font_sizes)
+        stats = create_k_group_bar_plot(df_benchmark, k_value, file_save_path, exp_id, publication_font_sizes)
         k_group_stats[k_value] = stats
     except Exception as e:
         save_and_print(f"Error creating k={k_value} bar plot: {e}", print_report_file, level="info")
@@ -1072,7 +1136,7 @@ for k_value in k_values:
 # Create comparative k-group plot with error handling
 save_and_print("### Comparative K-Group Analysis", print_report_file, level="subsection")
 try:
-    comparison_results = create_k_group_comparison_plot(df_benchmark, k_values, file_save_path, exp_id, large_font_sizes)
+    comparison_results = create_k_group_comparison_plot(df_benchmark, k_values, file_save_path, exp_id, publication_font_sizes)
 except Exception as e:
     save_and_print(f"Error creating comparative k-group plot: {e}", print_report_file, level="info")
 
