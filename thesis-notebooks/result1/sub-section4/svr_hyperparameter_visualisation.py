@@ -324,49 +324,6 @@ plt.show()
 
 save_and_print("Created SVR kernel type comparison box plot", print_report_file, level="info")
 
-# %% [markdown]
-# ### Figure 2: Mean Performance of SVR Kernel Types (Bar Plot)
-
-# %%
-# Calculate mean and standard deviation for each kernel type
-kernel_stats = df_benchmark.groupby('svr_kernel')['model_performance'].agg(['mean', 'std', 'count']).reset_index()
-
-# Create publication-quality bar plot with error bars
-plt.figure(figsize=(12, 6), dpi=300)
-plt.rcParams['font.family'] = 'sans'
-plt.rcParams['font.size'] = 12
-plt.rcParams['axes.linewidth'] = 1.2
-
-# Use consistent colors for bar plot
-bar_colors = [kernel_color_mapping[kernel] for kernel in kernel_stats['svr_kernel']]
-bars = plt.bar(range(len(kernel_stats)), kernel_stats['mean'], 
-               yerr=kernel_stats['std'], capsize=8, alpha=0.8,
-               color=bar_colors, edgecolor='black', linewidth=1)
-
-plt.title('Mean Performance of SVR Kernel Types', 
-          fontsize=16, fontweight='bold', pad=20)
-plt.xlabel('SVR Kernel Type', fontsize=14, fontweight='bold')
-plt.ylabel('Mean R² Score ± Std. Dev.', fontsize=14, fontweight='bold')
-plt.xticks(ticks=range(len(kernel_stats)), 
-           labels=[kernel_labels[k] for k in kernel_stats['svr_kernel']],
-           rotation=45, fontsize=12)
-plt.yticks(fontsize=12)
-plt.ylim(R2_RANGE)  # Set consistent R² range
-
-# Add value labels on bars with improved formatting
-for i, bar in enumerate(bars):
-    height = bar.get_height()
-    plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-             f'{height:.3f} ± {kernel_stats.iloc[i]["std"]:.3f}',
-             ha='center', va='bottom', fontsize=11, fontweight='bold')
-
-plt.grid(axis='y', alpha=0.2, linestyle='--')
-plt.tight_layout()
-plt.savefig(f"{file_save_path}svr_kernel_performance_bar_{exp_id}.png", dpi=300, bbox_inches='tight')
-plt.show()
-
-save_and_print("Created SVR kernel performance bar plot", print_report_file, level="info")
-
 # %%
 # Create comprehensive statistical summary for kernel types
 kernel_summary_table = df_benchmark.groupby('svr_kernel')['model_performance'].agg([
