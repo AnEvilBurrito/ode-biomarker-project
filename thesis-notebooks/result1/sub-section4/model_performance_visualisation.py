@@ -46,10 +46,16 @@ data_link = DataLink(path_loader, "data_codes.csv")
 folder_name = "ThesisResult5-ModelSelectionBenchmark"
 exp_id = "v1_fixed_network_mrmr_d3"
 
-if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}"):
-    os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}")
+# Create both the main folder and exp_id subfolder
+main_folder = f"{path_loader.get_data_path()}data/results/{folder_name}"
+exp_folder = f"{main_folder}/{exp_id}"
 
-file_save_path = f"{path_loader.get_data_path()}data/results/{folder_name}/"
+if not os.path.exists(main_folder):
+    os.makedirs(main_folder)
+if not os.path.exists(exp_folder):
+    os.makedirs(exp_folder)
+
+file_save_path = f"{exp_folder}/"
 
 # %%
 # Load saved model selection benchmark data
