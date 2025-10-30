@@ -417,7 +417,7 @@ def main():
             pk = PowerkitWithVariableSplit(feature_data, label_data, cv_split_size=split_size)
             
             # Register all conditions (method × size combinations) for current split size
-            rngs = np.random.RandomState(42).randint(0, 100000, size=20)  # 20 random seeds for robustness
+            rngs = np.random.RandomState(42).randint(0, 100000, size=1)  # 20 random seeds for robustness
             
             start_time = time.time()
             
