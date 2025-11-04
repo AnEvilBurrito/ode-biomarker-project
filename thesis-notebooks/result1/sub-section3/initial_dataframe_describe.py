@@ -43,9 +43,9 @@ from DataLink import DataLink #noqa: E402
 data_link = DataLink(path_loader, "data_codes.csv")
 
 # %%
-folder_name = "ThesisResult4-FeatureSelectionBenchmark"
-exp_id = "v5_network_integration_rep10"
-
+folder_name = "ThesisResult6-CVSplitSize"
+exp_id = "v2_rf_config1_k100_k500_split_size_investigation"
+filename_suffix = "cv_split_size_investigation"
 if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}"):
     os.makedirs(f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}")
 
@@ -349,7 +349,7 @@ print_report_file.write(f"# Feature Selection Print Report - {exp_id}\n\n")
 print_report_file.write(f"**Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 print_report_file.write("This report captures all print statements from the Results section with proper formatting.\n\n")
 
-pkl_path = f"{path_loader.get_data_path()}data/results/{folder_name}/feature_selection_benchmark_{exp_id}.pkl"
+pkl_path = f"{path_loader.get_data_path()}data/results/{folder_name}/{filename_suffix}_{exp_id}.pkl"
 if not os.path.exists(pkl_path):
     raise FileNotFoundError(f"Pickle not found: {pkl_path}")
 
