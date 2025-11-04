@@ -286,40 +286,51 @@ def feature_importance_eval(
             try:
                 explainer = shap.TreeExplainer(model)
                 shap_values = explainer.shap_values(Xsel_scaled)
-                # For regression, shap_values might be 2D, take mean absolute values
+                # For regression, shap_values might be 2D, take mean values
                 if len(shap_values.shape) == 2:
-                    feature_importance = np.abs(shap_values).mean(axis=0)
+                    feature_importance_abs = np.abs(shap_values).mean(axis=0)  # Absolute values
+                    feature_importance_signed = shap_values.mean(axis=0)       # Original signed values
                 else:
-                    feature_importance = np.abs(shap_values)
-                fi = (np.array(selected), feature_importance)
+                    feature_importance_abs = np.abs(shap_values)
+                    feature_importance_signed = shap_values
+                
+                fi = (np.array(selected), feature_importance_abs)  # Backward compatible: absolute values
+                fi_signed = (np.array(selected), feature_importance_signed)  # New: signed values
                 importance_source = "shap"
             except Exception as e:
                 print(f"SHAP calculation failed: {e}, falling back to MDI")
                 # Fall back to MDI if SHAP fails
                 if hasattr(model, "feature_importances_"):
                     fi = (np.array(selected), model.feature_importances_)
+                    fi_signed = None  # MDI doesn't have signed values
                 else:
                     fi = (np.array(selected), np.zeros(len(selected)))
+                    fi_signed = None
                 importance_source = "mdi_fallback"
         
         elif importance_method == "mdi":
             # Use MDI (Mean Decrease Impurity)
             if hasattr(model, "feature_importances_"):
                 fi = (np.array(selected), model.feature_importances_)
+                fi_signed = None  # MDI doesn't have signed values
             elif model_name in ("LinearRegression",) and len(selected) > 0:
                 coef = getattr(model, "coef_", np.zeros(len(selected)))
                 fi = (np.array(selected), np.abs(coef))
+                fi_signed = None
             else:
                 fi = (np.array(selected), np.zeros(len(selected)))
+                fi_signed = None
             importance_source = "mdi"
     else:
         fi = (np.array(selected), np.zeros(len(selected)))
+        fi_signed = None
         importance_source = "none"
 
     primary = metrics.get(metric_primary, metrics["r2"])
 
     return {
-        "feature_importance": fi,
+        "feature_importance": fi,  # Backward compatible: absolute values
+        "feature_importance_signed": fi_signed,  # New: signed values (SHAP only, MDI=None)
         "feature_importance_from": importance_source,
         "model_performance": float(primary) if primary is not None else np.nan,
         "metrics": metrics,
@@ -352,11 +363,12 @@ class PowerkitWithVariableSplit(Powerkit):
 def save_consensus_feature_importance(total_df, condition, file_save_path):
     """
     Save consensus feature importance results to dedicated files
+    Now supports both absolute and signed importance values
     """
     # Filter results for the specific condition
     condition_df = total_df[total_df['condition'] == condition]
     
-    # Extract feature importance data
+    # Extract absolute feature importance data (backward compatible)
     all_importance_data = []
     for _, row in condition_df.iterrows():
         feature_names = row['feature_importance'][0]
@@ -371,10 +383,10 @@ def save_consensus_feature_importance(total_df, condition, file_save_path):
                 'importance_method': row.get('importance_method', 'unknown')
             })
     
-    # Create iteration-level importance DataFrame
+    # Create iteration-level importance DataFrame for absolute values
     iteration_importance_df = pd.DataFrame(all_importance_data)
     
-    # Calculate consensus importance (mean across iterations)
+    # Calculate consensus importance (mean across iterations) for absolute values
     consensus_importance = iteration_importance_df.groupby('feature_name').agg({
         'importance_score': ['mean', 'std', 'count'],
         'importance_method': 'first'
@@ -392,15 +404,63 @@ def save_consensus_feature_importance(total_df, condition, file_save_path):
     # Sort by mean importance
     consensus_importance = consensus_importance.sort_values('mean_importance', ascending=False)
     
-    # Save consensus results
+    # Save consensus results for absolute values
     consensus_file = f"{file_save_path}consensus_feature_importance_{condition}.pkl"
     consensus_importance.to_pickle(consensus_file)
     
-    # Save iteration-level data for deeper analysis
+    # Save iteration-level data for absolute values
     iteration_file = f"{file_save_path}iteration_feature_importance_{condition}.pkl"
     iteration_importance_df.to_pickle(iteration_file)
     
-    return consensus_importance, iteration_importance_df
+    # Extract signed feature importance data if available (SHAP only)
+    all_signed_importance_data = []
+    for _, row in condition_df.iterrows():
+        if row.get('feature_importance_signed') is not None:
+            feature_names = row['feature_importance_signed'][0]
+            signed_scores = row['feature_importance_signed'][1]
+            rng = row['rng']
+            
+            for feature_name, score in zip(feature_names, signed_scores):
+                all_signed_importance_data.append({
+                    'iteration_rng': rng,
+                    'feature_name': feature_name,
+                    'importance_score_signed': score,
+                    'importance_method': row.get('importance_method', 'unknown')
+                })
+    
+    # Create iteration-level importance DataFrame for signed values (if available)
+    if all_signed_importance_data:
+        iteration_signed_importance_df = pd.DataFrame(all_signed_importance_data)
+        
+        # Calculate consensus importance for signed values
+        consensus_signed_importance = iteration_signed_importance_df.groupby('feature_name').agg({
+            'importance_score_signed': ['mean', 'std', 'count'],
+            'importance_method': 'first'
+        }).round(6)
+        
+        # Flatten column names
+        consensus_signed_importance.columns = ['_'.join(col).strip() for col in consensus_signed_importance.columns.values]
+        consensus_signed_importance = consensus_signed_importance.rename(columns={
+            'importance_score_signed_mean': 'mean_importance_signed',
+            'importance_score_signed_std': 'std_importance_signed',
+            'importance_score_signed_count': 'occurrence_count',
+            'importance_method_first': 'importance_method'
+        })
+        
+        # Sort by mean signed importance
+        consensus_signed_importance = consensus_signed_importance.sort_values('mean_importance_signed', ascending=False)
+        
+        # Save consensus results for signed values
+        consensus_signed_file = f"{file_save_path}consensus_feature_importance_signed_{condition}.pkl"
+        consensus_signed_importance.to_pickle(consensus_signed_file)
+        
+        # Save iteration-level data for signed values
+        iteration_signed_file = f"{file_save_path}iteration_feature_importance_signed_{condition}.pkl"
+        iteration_signed_importance_df.to_pickle(iteration_signed_file)
+        
+        return consensus_importance, iteration_importance_df, consensus_signed_importance, iteration_signed_importance_df
+    
+    return consensus_importance, iteration_importance_df, None, None
 
 
 def compare_feature_importance_methods(shap_consensus, mdi_consensus, file_save_path, condition_base):
@@ -593,13 +653,19 @@ def main():
             print_and_save(f"Final relative tolerance: {meta_df['current_tol'].iloc[-1]:.6f}", report)
             print_and_save(f"Final absolute difference: {meta_df['abs_diff'].iloc[-1]:.6f}", report)
             
-            # Save consensus feature importance
-            consensus_importance, iteration_importance = save_consensus_feature_importance(
+            # Save consensus feature importance (now returns 4 values)
+            consensus_importance, iteration_importance, consensus_signed_importance, iteration_signed_importance = save_consensus_feature_importance(
                 total_df, condition, file_save_path
             )
             
             all_consensus_results[condition] = consensus_importance
             all_iteration_results[condition] = iteration_importance
+            
+            # Report on signed importance availability
+            if consensus_signed_importance is not None:
+                print_and_save(f"✓ Signed feature importance saved for {condition}", report)
+            else:
+                print_and_save(f"✓ Only absolute feature importance available for {condition} (MDI method)", report)
             
             # Save main results
             total_df.to_pickle(f"{file_save_path}total_results_{condition}.pkl")
@@ -648,6 +714,8 @@ def main():
         print_and_save("Key files generated:", report)
         print_and_save("- Consensus feature importance files (*_consensus_feature_importance_*.pkl)", report)
         print_and_save("- Iteration-level importance files (*_iteration_feature_importance_*.pkl)", report)
+        print_and_save("- Signed consensus feature importance files (*_consensus_feature_importance_signed_*.pkl) - SHAP only", report)
+        print_and_save("- Signed iteration-level importance files (*_iteration_feature_importance_signed_*.pkl) - SHAP only", report)
         print_and_save("- Method comparison files (*_feature_importance_comparison_*.pkl)", report)
         print_and_save("- Main results files (*_total_results_*.pkl)", report)
         print_and_save("- Meta results files (*_meta_results_*.pkl)", report)
