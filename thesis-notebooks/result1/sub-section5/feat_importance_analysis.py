@@ -274,6 +274,9 @@ color_mapping = {
     'mdi': '#ff7f0e'    # Orange for MDI
 }
 
+
+# %%
+
 # Plot 1: Jaccard stability vs top N features
 plt.figure(figsize=(10, 6), dpi=300)
 
@@ -681,6 +684,334 @@ if shap_signed_analysis is not None:
     plt.show()
     
     save_and_print("Created enhanced SHAP signed values distribution plot", print_report_file, level="info")
+
+# %% [markdown]
+# ## SHAP Signed vs Importance Values Consistency Analysis
+
+# %%
+save_and_print("## SHAP Signed vs Importance Values Consistency Analysis", print_report_file, level="section")
+
+def analyze_shap_consistency(data_files, file_save_path, exp_id):
+    """
+    Analyze consistency between SHAP importance values and signed values
+    """
+    shap_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_shap"
+    
+    if (shap_condition not in data_files or 
+        'consensus_feature_importance' not in data_files[shap_condition] or
+        'consensus_feature_importance_signed' not in data_files[shap_condition]):
+        save_and_print("SHAP data not available for consistency analysis", print_report_file, level="info")
+        return None
+    
+    # Get both importance and signed consensus data
+    importance_consensus = data_files[shap_condition]['consensus_feature_importance']
+    signed_consensus = data_files[shap_condition]['consensus_feature_importance_signed']
+    
+    # Create unified dataframe
+    consistency_df = pd.DataFrame()
+    
+    # Get common features
+    common_features = set(importance_consensus.index) & set(signed_consensus.index)
+    
+    for feature in common_features:
+        importance_data = importance_consensus.loc[feature]
+        signed_data = signed_consensus.loc[feature]
+        
+        consistency_df.loc[feature, 'importance_mean'] = importance_data.get('mean_importance', np.nan)
+        consistency_df.loc[feature, 'importance_std'] = importance_data.get('std_importance', np.nan)
+        consistency_df.loc[feature, 'signed_mean'] = signed_data.get('mean_importance_signed', np.nan)
+        consistency_df.loc[feature, 'signed_std'] = signed_data.get('std_importance_signed', np.nan)
+        consistency_df.loc[feature, 'occurrence_count'] = signed_data.get('occurrence_count', np.nan)
+    
+    # Calculate absolute signed values for comparison
+    consistency_df['abs_signed_mean'] = consistency_df['signed_mean'].abs()
+    
+    # Calculate rankings
+    consistency_df['importance_rank'] = consistency_df['importance_mean'].rank(ascending=False, method='min')
+    consistency_df['signed_rank'] = consistency_df['abs_signed_mean'].rank(ascending=False, method='min')
+    consistency_df['rank_difference'] = abs(consistency_df['importance_rank'] - consistency_df['signed_rank'])
+    
+    # Calculate correlation
+    valid_data = consistency_df.dropna(subset=['importance_mean', 'abs_signed_mean'])
+    if len(valid_data) > 1:
+        pearson_corr, pearson_p = spearmanr(valid_data['importance_mean'], valid_data['abs_signed_mean'])
+        spearman_corr, spearman_p = spearmanr(valid_data['importance_rank'], valid_data['signed_rank'])
+    else:
+        pearson_corr = pearson_p = spearman_corr = spearman_p = np.nan
+    
+    save_and_print("### SHAP Consistency Analysis Summary", print_report_file, level="subsection")
+    save_and_print(f"Total features analyzed: {len(consistency_df)}", print_report_file, level="info")
+    save_and_print(f"Pearson correlation (magnitude): {pearson_corr:.3f} (p={pearson_p:.4f})", print_report_file, level="info")
+    save_and_print(f"Spearman correlation (ranking): {spearman_corr:.3f} (p={spearman_p:.4f})", print_report_file, level="info")
+    
+    # Identify consistency patterns
+    top_n = min(20, len(consistency_df) // 4)
+    top_importance = set(consistency_df.nsmallest(top_n, 'importance_rank').index)
+    top_signed = set(consistency_df.nsmallest(top_n, 'signed_rank').index)
+    overlap = len(top_importance & top_signed)
+    
+    save_and_print(f"Top {top_n} features overlap: {overlap}/{top_n} ({overlap/top_n*100:.1f}%)", print_report_file, level="info")
+    
+    return consistency_df, pearson_corr, spearman_corr
+
+# Perform consistency analysis
+shap_consistency_results = analyze_shap_consistency(data_files, file_save_path, exp_id)
+
+# %% [markdown]
+# ### SHAP Consistency Scatter Plot
+
+# %%
+if shap_consistency_results is not None:
+    consistency_df, pearson_corr, spearman_corr = shap_consistency_results
+    
+    # Create publication-quality scatter plot
+    plt.figure(figsize=(10, 8), dpi=300)
+    plt.rcParams['font.size'] = 14
+    
+    # Create scatter plot with error bars
+    plt.errorbar(consistency_df['importance_mean'], consistency_df['abs_signed_mean'],
+                 xerr=consistency_df['importance_std'], yerr=consistency_df['signed_std'],
+                 fmt='o', alpha=0.6, markersize=8, capsize=3, 
+                 color='#1f77b4', ecolor='#1f77b4', elinewidth=1)
+    
+    # Add trend line if correlation is significant
+    if pearson_corr > 0.3 and len(consistency_df) > 2:
+        z = np.polyfit(consistency_df['importance_mean'], consistency_df['abs_signed_mean'], 1)
+        p = np.poly1d(z)
+        plt.plot(consistency_df['importance_mean'], p(consistency_df['importance_mean']), 
+                 "r--", alpha=0.8, linewidth=2, label=f'Trend line (r={pearson_corr:.3f})')
+        plt.legend(fontsize=12)
+    
+    plt.xlabel('SHAP Importance (Magnitude)', fontsize=14, fontweight='bold')
+    plt.ylabel('Absolute SHAP Signed Value (Directional Strength)', fontsize=14, fontweight='bold')
+    plt.title('SHAP Consistency: Importance vs Absolute Signed Values', 
+              fontsize=16, fontweight='bold', pad=20)
+    
+    # Add correlation annotation
+    plt.text(0.05, 0.95, f'Pearson r = {pearson_corr:.3f}\nSpearman ρ = {spearman_corr:.3f}', 
+             transform=plt.gca().transAxes, fontsize=12, 
+             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+             verticalalignment='top')
+    
+    plt.grid(True, alpha=0.2, linestyle='--')
+    plt.tight_layout()
+    plt.savefig(f"{file_save_path}shap_consistency_scatter_{exp_id}.png", dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    save_and_print("Created SHAP consistency scatter plot", print_report_file, level="info")
+    
+    # Print top inconsistent features
+    save_and_print("### Top 10 Most Inconsistent Features", print_report_file, level="subsection")
+    inconsistent_features = consistency_df.nlargest(10, 'rank_difference')[['importance_mean', 'abs_signed_mean', 'importance_rank', 'signed_rank', 'rank_difference']]
+    save_and_print(inconsistent_features.to_string(), print_report_file, level="info")
+
+# %% [markdown]
+# ## MDI Feature Importance Visualization
+
+# %%
+save_and_print("## MDI Feature Importance Visualization", print_report_file, level="section")
+
+def visualize_mdi_importance(data_files, file_save_path, exp_id):
+    """
+    Create MDI consensus feature importance visualization
+    """
+    mdi_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_mdi"
+    
+    if mdi_condition not in data_files or 'consensus_feature_importance' not in data_files[mdi_condition]:
+        save_and_print("MDI consensus data not available for visualization", print_report_file, level="info")
+        return None
+    
+    mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
+    
+    # Get top 20 features by MDI importance
+    top_mdi_features = mdi_consensus.nlargest(20, 'mean_importance')
+    
+    # Create publication-quality MDI bar plot
+    plt.figure(figsize=(12, 8), dpi=300)
+    plt.rcParams['font.size'] = 14
+    
+    # Create horizontal bar plot
+    y_pos = range(len(top_mdi_features))
+    bars = plt.barh(y_pos, top_mdi_features['mean_importance'], 
+                    xerr=top_mdi_features['std_importance'], 
+                    color='#ff7f0e', alpha=0.7, edgecolor='black', linewidth=1,
+                    capsize=5, ecolor='#cc5a0a')
+    
+    plt.yticks(y_pos, top_mdi_features.index, fontsize=12)
+    plt.xlabel('MDI Importance Score', fontsize=14, fontweight='bold')
+    plt.ylabel('Feature', fontsize=14, fontweight='bold')
+    plt.title('Top 20 Features by MDI Importance\n(Mean ± Standard Deviation)', 
+              fontsize=16, fontweight='bold')
+    
+    # Add value labels
+    for i, (mean_val, std_val) in enumerate(zip(top_mdi_features['mean_importance'], top_mdi_features['std_importance'])):
+        plt.text(mean_val + std_val + 0.01, i, f'{mean_val:.3f} ± {std_val:.3f}', 
+                va='center', fontsize=10, fontweight='bold')
+    
+    plt.grid(axis='x', alpha=0.2, linestyle='--')
+    plt.tight_layout()
+    plt.savefig(f"{file_save_path}mdi_consensus_importance_{exp_id}.png", dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    save_and_print("Created MDI consensus feature importance bar plot", print_report_file, level="info")
+    
+    return top_mdi_features
+
+# Perform MDI visualization
+mdi_top_features = visualize_mdi_importance(data_files, file_save_path, exp_id)
+
+# %% [markdown]
+# ### MDI vs SHAP Comparison
+
+# %%
+save_and_print("### MDI vs SHAP Feature Importance Comparison", print_report_file, level="subsection")
+
+def compare_mdi_shap(data_files, file_save_path, exp_id, top_n=15):
+    """
+    Compare MDI and SHAP feature importance rankings
+    """
+    mdi_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_mdi"
+    shap_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_shap"
+    
+    if (mdi_condition not in data_files or 'consensus_feature_importance' not in data_files[mdi_condition] or
+        shap_condition not in data_files or 'consensus_feature_importance' not in data_files[shap_condition]):
+        save_and_print("MDI or SHAP consensus data not available for comparison", print_report_file, level="info")
+        return None
+    
+    mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
+    shap_consensus = data_files[shap_condition]['consensus_feature_importance']
+    
+    # Get top features from both methods
+    top_mdi = mdi_consensus.nlargest(top_n, 'mean_importance')
+    top_shap = shap_consensus.nlargest(top_n, 'mean_importance')
+    
+    # Create side-by-side comparison plot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=300)
+    plt.rcParams['font.size'] = 14
+    
+    # MDI plot
+    y_pos = range(len(top_mdi))
+    ax1.barh(y_pos, top_mdi['mean_importance'], 
+             xerr=top_mdi['std_importance'], 
+             color='#ff7f0e', alpha=0.7, edgecolor='black', linewidth=1,
+             capsize=5, ecolor='#cc5a0a')
+    
+    ax1.set_yticks(y_pos)
+    ax1.set_yticklabels(top_mdi.index, fontsize=12)
+    ax1.set_xlabel('MDI Importance Score', fontsize=12, fontweight='bold')
+    ax1.set_title('Top Features by MDI', fontsize=14, fontweight='bold')
+    ax1.grid(axis='x', alpha=0.2, linestyle='--')
+    
+    # SHAP plot
+    y_pos = range(len(top_shap))
+    ax2.barh(y_pos, top_shap['mean_importance'], 
+             xerr=top_shap['std_importance'], 
+             color='#1f77b4', alpha=0.7, edgecolor='black', linewidth=1,
+             capsize=5, ecolor='#155a8a')
+    
+    ax2.set_yticks(y_pos)
+    ax2.set_yticklabels(top_shap.index, fontsize=12)
+    ax2.set_xlabel('SHAP Importance Score', fontsize=12, fontweight='bold')
+    ax2.set_title('Top Features by SHAP', fontsize=14, fontweight='bold')
+    ax2.grid(axis='x', alpha=0.2, linestyle='--')
+    
+    plt.tight_layout()
+    plt.savefig(f"{file_save_path}mdi_shap_comparison_{exp_id}.png", dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    # Calculate overlap and correlation
+    mdi_features = set(top_mdi.index)
+    shap_features = set(top_shap.index)
+    overlap = mdi_features.intersection(shap_features)
+    
+    save_and_print(f"**Top {top_n} Features Overlap Analysis:**", print_report_file, level="info")
+    save_and_print(f"- MDI unique features: {len(mdi_features - shap_features)}", print_report_file, level="info")
+    save_and_print(f"- SHAP unique features: {len(shap_features - mdi_features)}", print_report_file, level="info")
+    save_and_print(f"- Overlapping features: {len(overlap)}", print_report_file, level="info")
+    save_and_print(f"- Overlap percentage: {len(overlap) / top_n * 100:.1f}%", print_report_file, level="info")
+    
+    if overlap:
+        save_and_print("**Overlapping features:**", print_report_file, level="info")
+        for feature in sorted(overlap):
+            mdi_rank = list(top_mdi.index).index(feature) + 1
+            shap_rank = list(top_shap.index).index(feature) + 1
+            save_and_print(f"  - {feature}: MDI rank #{mdi_rank}, SHAP rank #{shap_rank}", print_report_file, level="info")
+    
+    return top_mdi, top_shap
+
+# Perform comparison
+comparison_results = compare_mdi_shap(data_files, file_save_path, exp_id)
+
+# %% [markdown]
+# ### Feature Importance CSV Export
+
+# %%
+save_and_print("### Feature Importance CSV Export", print_report_file, level="subsection")
+
+def export_feature_importance_csv(data_files, file_save_path, exp_id, top_n=50):
+    """
+    Export comprehensive feature importance data to CSV
+    """
+    mdi_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_mdi"
+    shap_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_shap"
+    
+    if (mdi_condition not in data_files or 'consensus_feature_importance' not in data_files[mdi_condition] or
+        shap_condition not in data_files or 'consensus_feature_importance' not in data_files[shap_condition]):
+        save_and_print("MDI or SHAP consensus data not available for CSV export", print_report_file, level="info")
+        return None
+    
+    mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
+    shap_consensus = data_files[shap_condition]['consensus_feature_importance']
+    
+    # Create comprehensive feature importance dataframe
+    feature_importance_df = pd.DataFrame()
+    
+    # Get all unique features from both methods
+    all_features = set(mdi_consensus.index) | set(shap_consensus.index)
+    
+    # Create dataframe with importance scores
+    for feature in all_features:
+        mdi_data = mdi_consensus.loc[feature] if feature in mdi_consensus.index else pd.Series({'mean_importance': np.nan, 'std_importance': np.nan})
+        shap_data = shap_consensus.loc[feature] if feature in shap_consensus.index else pd.Series({'mean_importance': np.nan, 'std_importance': np.nan})
+        
+        feature_importance_df.loc[feature, 'mdi_mean_importance'] = mdi_data.get('mean_importance', np.nan)
+        feature_importance_df.loc[feature, 'mdi_std_importance'] = mdi_data.get('std_importance', np.nan)
+        feature_importance_df.loc[feature, 'shap_mean_importance'] = shap_data.get('mean_importance', np.nan)
+        feature_importance_df.loc[feature, 'shap_std_importance'] = shap_data.get('std_importance', np.nan)
+    
+    # Calculate rankings
+    feature_importance_df['mdi_rank'] = feature_importance_df['mdi_mean_importance'].rank(ascending=False, method='min')
+    feature_importance_df['shap_rank'] = feature_importance_df['shap_mean_importance'].rank(ascending=False, method='min')
+    
+    # Calculate rank difference
+    feature_importance_df['rank_difference'] = abs(feature_importance_df['mdi_rank'] - feature_importance_df['shap_rank'])
+    
+    # Add agreement indicator (features in top N of both methods)
+    top_n_mdi = set(feature_importance_df.nsmallest(top_n, 'mdi_rank').index)
+    top_n_shap = set(feature_importance_df.nsmallest(top_n, 'shap_rank').index)
+    feature_importance_df['in_top_both'] = feature_importance_df.index.isin(top_n_mdi & top_n_shap)
+    
+    # Sort by MDI importance (most important first)
+    feature_importance_df = feature_importance_df.sort_values('mdi_mean_importance', ascending=False)
+    
+    # Save to CSV
+    csv_path = f"{file_save_path}feature_importance_comprehensive_{exp_id}.csv"
+    feature_importance_df.to_csv(csv_path)
+    
+    save_and_print(f"Comprehensive feature importance data exported to: {csv_path}", print_report_file, level="info")
+    save_and_print(f"Total features exported: {len(feature_importance_df)}", print_report_file, level="info")
+    save_and_print(f"Features in top {top_n} of both methods: {feature_importance_df['in_top_both'].sum()}", print_report_file, level="info")
+    
+    # Print summary statistics
+    save_and_print("**Feature Importance Summary Statistics:**", print_report_file, level="info")
+    save_and_print(f"- MDI mean importance: {feature_importance_df['mdi_mean_importance'].mean():.4f} ± {feature_importance_df['mdi_mean_importance'].std():.4f}", print_report_file, level="info")
+    save_and_print(f"- SHAP mean importance: {feature_importance_df['shap_mean_importance'].mean():.4f} ± {feature_importance_df['shap_mean_importance'].std():.4f}", print_report_file, level="info")
+    save_and_print(f"- Average rank difference: {feature_importance_df['rank_difference'].mean():.1f} ± {feature_importance_df['rank_difference'].std():.1f}", print_report_file, level="info")
+    
+    return feature_importance_df
+
+# Export feature importance data
+feature_importance_export = export_feature_importance_csv(data_files, file_save_path, exp_id)
 
 # %% [markdown]
 # ## Comprehensive Results Summary
