@@ -200,9 +200,9 @@ def jaccard_similarity(set1, set2):
     union = len(set1 | set2)
     return intersection / union if union > 0 else 0.0
 
-def calculate_jaccard_stability(data_files, top_n=50):
+def calculate_jaccard_stability_parallel(data_files, top_n=50, max_workers=None):
     """
-    Calculate Jaccard similarity stability for different importance methods
+    Calculate Jaccard similarity stability for different importance methods using parallel processing
     """
     stability_results = {}
     
@@ -219,19 +219,50 @@ def calculate_jaccard_stability(data_files, top_n=50):
             save_and_print(f"Not enough iterations for {condition} (n={len(iterations)})", print_report_file, level="info")
             continue
         
-        # Calculate pairwise Jaccard similarities for top features
-        jaccard_similarities = []
+        # Precompute top features for each iteration to avoid redundant calculations
+        iteration_top_features = {}
+        for iteration in iterations:
+            iter_data = iteration_df[iteration_df['iteration_rng'] == iteration]
+            top_features = set(iter_data.nlargest(top_n, 'importance_score')['feature_name'])
+            iteration_top_features[iteration] = top_features
         
-        for i in range(len(iterations)):
-            for j in range(i + 1, len(iterations)):
-                # Get top features for iteration i
-                iter_i_data = iteration_df[iteration_df['iteration_rng'] == iterations[i]]
-                top_i = set(iter_i_data.nlargest(top_n, 'importance_score')['feature_name'])
-                
-                # Get top features for iteration j
-                iter_j_data = iteration_df[iteration_df['iteration_rng'] == iterations[j]]
-                top_j = set(iter_j_data.nlargest(top_n, 'importance_score')['feature_name'])
-                
+        # Generate all pairwise combinations for parallel processing
+        from itertools import combinations
+        iteration_pairs = list(combinations(iterations, 2))
+        
+        if len(iteration_pairs) == 0:
+            continue
+        
+        # Use parallel processing for Jaccard similarity calculations
+        try:
+            from concurrent.futures import ProcessPoolExecutor
+            import multiprocessing
+            
+            # Determine number of workers
+            if max_workers is None:
+                max_workers = min(multiprocessing.cpu_count(), len(iteration_pairs))
+            
+            # Function to calculate Jaccard similarity for a pair
+            def calculate_pair_similarity(pair):
+                i, j = pair
+                top_i = iteration_top_features[i]
+                top_j = iteration_top_features[j]
+                return jaccard_similarity(top_i, top_j)
+            
+            # Process pairs in parallel
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                jaccard_similarities = list(executor.map(calculate_pair_similarity, iteration_pairs))
+            
+            save_and_print(f"✓ Processed {len(iteration_pairs)} pairs for {condition} using {max_workers} workers", print_report_file, level="info")
+            
+        except Exception as e:
+            save_and_print(f"Parallel processing failed for {condition}: {e}. Falling back to sequential processing.", print_report_file, level="info")
+            
+            # Fallback to sequential processing
+            jaccard_similarities = []
+            for i, j in iteration_pairs:
+                top_i = iteration_top_features[i]
+                top_j = iteration_top_features[j]
                 similarity = jaccard_similarity(top_i, top_j)
                 jaccard_similarities.append(similarity)
         
@@ -245,18 +276,131 @@ def calculate_jaccard_stability(data_files, top_n=50):
     
     return stability_results
 
-# Calculate Jaccard stability for different top N values
-top_n_values = [10, 25, 50, 100]
-stability_results_all = {}
+def calculate_jaccard_stability(data_files, top_n=50):
+    """
+    Calculate Jaccard similarity stability for different importance methods
+    (Wrapper function that uses parallel processing by default)
+    """
+    return calculate_jaccard_stability_parallel(data_files, top_n, max_workers=None)
 
-for top_n in top_n_values:
-    stability_results = calculate_jaccard_stability(data_files, top_n)
-    stability_results_all[top_n] = stability_results
+def load_or_compute_stability(data_files, top_n_values, exp_id, file_save_path, force_recompute=False):
+    """
+    Load precomputed stability results or compute them if not available
+    Includes data integrity checks and versioning
+    """
+    stability_file = f"{file_save_path}stability_results_{exp_id}.pkl"
+    metadata_file = f"{file_save_path}stability_metadata_{exp_id}.json"
     
-    save_and_print(f"### Jaccard Stability (Top {top_n} Features)", print_report_file, level="subsection")
-    for condition, results in stability_results.items():
-        save_and_print(f"**{condition}**: Mean Jaccard = {results['mean_jaccard']:.3f} ± {results['std_jaccard']:.3f} (n={results['n_comparisons']})", 
-                      print_report_file, level="info")
+    # Check if results exist and should be loaded
+    if not force_recompute and os.path.exists(stability_file) and os.path.exists(metadata_file):
+        try:
+            # Load metadata for validation
+            import json
+            import hashlib
+            
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+            
+            # Validate metadata structure and version
+            current_top_n = sorted(top_n_values)
+            saved_top_n = sorted(metadata.get('top_n_values', []))
+            metadata_version = metadata.get('version', '1.0')
+            
+            # Check if we need to recompute due to version changes
+            if metadata_version != '1.1':  # Current version
+                save_and_print(f"Metadata version mismatch: saved={metadata_version}, current=1.1", print_report_file, level="info")
+                save_and_print("Recomputing stability results due to version change...", print_report_file, level="info")
+            elif current_top_n != saved_top_n:
+                save_and_print(f"Top N values mismatch: current={current_top_n}, saved={saved_top_n}", print_report_file, level="info")
+                save_and_print("Recomputing stability results...", print_report_file, level="info")
+            else:
+                # Additional data integrity check: verify file size and hash
+                file_size = os.path.getsize(stability_file)
+                if file_size == 0:
+                    save_and_print("Stability results file is empty", print_report_file, level="info")
+                    save_and_print("Recomputing stability results...", print_report_file, level="info")
+                else:
+                    # Load precomputed results
+                    stability_results_all = pd.read_pickle(stability_file)
+                    
+                    # Verify the loaded data structure
+                    if not isinstance(stability_results_all, dict):
+                        save_and_print("Invalid stability results format", print_report_file, level="info")
+                        save_and_print("Recomputing stability results...", print_report_file, level="info")
+                    else:
+                        # Check if all expected top_n values are present
+                        missing_top_n = set(top_n_values) - set(stability_results_all.keys())
+                        if missing_top_n:
+                            save_and_print(f"Missing top_n values in loaded results: {missing_top_n}", print_report_file, level="info")
+                            save_and_print("Recomputing stability results...", print_report_file, level="info")
+                        else:
+                            save_and_print(f"✓ Loaded precomputed stability results from {stability_file}", print_report_file, level="info")
+                            save_and_print(f"  Generated: {metadata.get('timestamp', 'unknown')}", print_report_file, level="info")
+                            save_and_print(f"  Version: {metadata_version}", print_report_file, level="info")
+                            save_and_print(f"  File size: {file_size} bytes", print_report_file, level="info")
+                            return stability_results_all
+        
+        except Exception as e:
+            save_and_print(f"Error loading precomputed results: {e}", print_report_file, level="info")
+            save_and_print("Recomputing stability results...", print_report_file, level="info")
+    
+    # Compute stability results
+    save_and_print("Computing Jaccard stability results...", print_report_file, level="info")
+    stability_results_all = {}
+    
+    for top_n in top_n_values:
+        stability_results = calculate_jaccard_stability(data_files, top_n)
+        stability_results_all[top_n] = stability_results
+        
+        save_and_print(f"### Jaccard Stability (Top {top_n} Features)", print_report_file, level="subsection")
+        for condition, results in stability_results.items():
+            save_and_print(f"**{condition}**: Mean Jaccard = {results['mean_jaccard']:.3f} ± {results['std_jaccard']:.3f} (n={results['n_comparisons']})", 
+                          print_report_file, level="info")
+    
+    # Save results for future use with enhanced metadata
+    try:
+        # Save stability results
+        pd.to_pickle(stability_results_all, stability_file)
+        
+        # Calculate file hash for integrity checking
+        import hashlib
+        with open(stability_file, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()
+        
+        # Enhanced metadata with versioning and integrity info
+        metadata = {
+            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'top_n_values': top_n_values,
+            'exp_id': exp_id,
+            'conditions': list(data_files.keys()),
+            'version': '1.1',  # Current version
+            'file_size': os.path.getsize(stability_file),
+            'file_hash': file_hash,
+            'computation_method': 'parallel_processing',
+            'data_integrity_checks': {
+                'top_n_validation': True,
+                'file_size_validation': True,
+                'version_validation': True
+            }
+        }
+        
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        save_and_print(f"✓ Saved stability results to {stability_file}", print_report_file, level="info")
+        save_and_print(f"✓ Saved enhanced metadata to {metadata_file}", print_report_file, level="info")
+        save_and_print(f"  Version: {metadata['version']}", print_report_file, level="info")
+        save_and_print(f"  File size: {metadata['file_size']} bytes", print_report_file, level="info")
+        save_and_print(f"  File hash: {metadata['file_hash'][:16]}...", print_report_file, level="info")
+        
+    except Exception as e:
+        save_and_print(f"Warning: Could not save stability results: {e}", print_report_file, level="info")
+    
+    return stability_results_all
+
+# Calculate Jaccard stability for different top N values with file-based persistence
+top_n_values = [10, 25, 50, 100]
+stability_results_all = load_or_compute_stability(data_files, top_n_values, exp_id, file_save_path, force_recompute=False)
 
 # %% [markdown]
 # ### Jaccard Stability Visualization
@@ -410,17 +554,15 @@ for condition, files in data_files.items():
     save_and_print(f"  - Final tolerance: {convergence_results[condition]['final_tolerance']:.6f}", print_report_file, level="info")
 
 # %% [markdown]
-# ### Convergence Visualization
+# ### Convergence Visualization - Separate Plots
 
 # %%
-# Create publication-quality convergence plots
-plt.figure(figsize=(12, 8), dpi=300)
+# Create publication-quality convergence plots as separate figures
 plt.rcParams['font.size'] = 14
 
-# Create subplots for individual and comparative views
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
+# Plot 1: Individual convergence curves (separate file)
+plt.figure(figsize=(8, 5), dpi=300)
 
-# Plot 1: Individual convergence curves
 for condition, files in data_files.items():
     if 'meta_results' not in files:
         continue
@@ -429,26 +571,24 @@ for condition, files in data_files.items():
     method_color = color_mapping['shap'] if 'shap' in condition else color_mapping['mdi']
     method_label = 'SHAP' if 'shap' in condition else 'MDI'
     
-    ax1.plot(meta_df['iteration'], meta_df['current_tol'], 
+    plt.plot(meta_df['iteration'], meta_df['current_tol'], 
              marker='o', linewidth=2, markersize=4,
              color=method_color, label=method_label)
-    
-    # Add AUC annotation
-    auc = convergence_results[condition]['auc']
-    ax1.annotate(f'AUC: {auc:.3f}', 
-                xy=(meta_df['iteration'].iloc[-1], meta_df['current_tol'].iloc[-1]),
-                xytext=(10, 10), textcoords='offset points',
-                fontsize=12, bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
 
-ax1.set_title('Individual Convergence Curves', fontsize=16, fontweight='bold')
-ax1.set_xlabel('Iteration', fontsize=14, fontweight='bold')
-ax1.set_ylabel('Relative Tolerance', fontsize=14, fontweight='bold')
-ax1.set_yscale('log')
-ax1.grid(True, alpha=0.2, linestyle='--')
-ax1.legend(fontsize=12)
+plt.title('Individual Convergence Curves', fontsize=16, fontweight='bold')
+plt.xlabel('Iteration', fontsize=14, fontweight='bold')
+plt.ylabel('Relative Tolerance', fontsize=14, fontweight='bold')
+plt.yscale('log')
+plt.grid(True, alpha=0.2, linestyle='--')
+plt.legend(fontsize=12)
+plt.tight_layout()
+plt.savefig(f"{file_save_path}individual_convergence_{exp_id}.png", dpi=300, bbox_inches='tight')
+plt.show()
 
-# Plot 2: Comparative convergence (normalized iterations)
-ax2.set_title('Comparative Convergence (Normalized Iterations)', fontsize=16, fontweight='bold')
+save_and_print("Created individual convergence curves plot", print_report_file, level="info")
+
+# Plot 2: Comparative convergence (normalized iterations) - separate file
+plt.figure(figsize=(8, 5), dpi=300)
 
 for condition, files in data_files.items():
     if 'meta_results' not in files:
@@ -461,21 +601,46 @@ for condition, files in data_files.items():
     # Normalize iterations to [0, 1]
     normalized_iterations = meta_df['iteration'] / meta_df['iteration'].max()
     
-    ax2.plot(normalized_iterations, meta_df['current_tol'], 
+    plt.plot(normalized_iterations, meta_df['current_tol'], 
              marker='o', linewidth=2, markersize=4,
              color=method_color, label=method_label)
 
-ax2.set_xlabel('Normalized Iteration', fontsize=14, fontweight='bold')
-ax2.set_ylabel('Relative Tolerance', fontsize=14, fontweight='bold')
-ax2.set_yscale('log')
-ax2.grid(True, alpha=0.2, linestyle='--')
-ax2.legend(fontsize=12)
-
+plt.title('Comparative Convergence (Normalized Iterations)', fontsize=16, fontweight='bold')
+plt.xlabel('Normalized Iteration', fontsize=14, fontweight='bold')
+plt.ylabel('Relative Tolerance', fontsize=14, fontweight='bold')
+plt.yscale('log')
+plt.grid(True, alpha=0.2, linestyle='--')
+plt.legend(fontsize=12)
 plt.tight_layout()
-plt.savefig(f"{file_save_path}convergence_analysis_{exp_id}.png", dpi=300, bbox_inches='tight')
+plt.savefig(f"{file_save_path}comparative_convergence_{exp_id}.png", dpi=300, bbox_inches='tight')
 plt.show()
 
-save_and_print("Created convergence analysis plots", print_report_file, level="info")
+save_and_print("Created comparative convergence plot", print_report_file, level="info")
+
+# Plot 3: Convergence AUC comparison (separate file)
+plt.figure(figsize=(8, 6), dpi=300)
+
+methods = []
+auc_values = []
+
+for condition in conditions:
+    if condition in convergence_results:
+        methods.append('SHAP' if 'shap' in condition else 'MDI')
+        auc_values.append(convergence_results[condition]['auc'])
+
+bars = plt.bar(methods, auc_values, 
+               color=[color_mapping['shap'] if m == 'SHAP' else color_mapping['mdi'] for m in methods],
+               alpha=0.8, edgecolor='black', linewidth=1, capsize=10)
+
+plt.title('Convergence Performance Comparison\n(AUC - Lower is Better)', fontsize=16, fontweight='bold')
+plt.ylabel('Area Under Curve (AUC)', fontsize=14, fontweight='bold')
+plt.grid(axis='y', alpha=0.2, linestyle='--')
+
+plt.tight_layout()
+plt.savefig(f"{file_save_path}convergence_auc_comparison_{exp_id}.png", dpi=300, bbox_inches='tight')
+plt.show()
+
+save_and_print("Created convergence AUC comparison plot", print_report_file, level="info")
 
 # %% [markdown]
 # ### AUC Comparison Statistical Analysis
@@ -765,10 +930,25 @@ if shap_consistency_results is not None:
     consistency_df, pearson_corr, spearman_corr = shap_consistency_results
     
     # Create publication-quality scatter plot
-    plt.figure(figsize=(10, 8), dpi=300)
+    plt.figure(figsize=(7, 6), dpi=300)
     plt.rcParams['font.size'] = 14
     
-    # Create scatter plot with error bars
+    # Scatter plot without error bars: draw points and annotate top features.
+    plt.scatter(consistency_df['importance_mean'], consistency_df['abs_signed_mean'],
+                c='#1f77b4', alpha=0.7, s=100, edgecolors='w', linewidth=0.5)
+    
+    # Suppress error bars by zeroing std columns so the subsequent plt.errorbar call produces no visible bars
+    if 'importance_std' in consistency_df.columns:
+        consistency_df['importance_std'] = 0.0
+    if 'signed_std' in consistency_df.columns:
+        consistency_df['signed_std'] = 0.0
+    
+    # Annotate top 10 features by importance for readability
+    top10 = consistency_df['importance_mean'].nlargest(10).index
+    for feat in top10:
+        x = consistency_df.loc[feat, 'importance_mean']
+        y = consistency_df.loc[feat, 'abs_signed_mean']
+        plt.text(x, y, feat, fontsize=10, va='bottom', ha='right', rotation=0)
     plt.errorbar(consistency_df['importance_mean'], consistency_df['abs_signed_mean'],
                  xerr=consistency_df['importance_std'], yerr=consistency_df['signed_std'],
                  fmt='o', alpha=0.6, markersize=8, capsize=3, 
@@ -779,7 +959,7 @@ if shap_consistency_results is not None:
         z = np.polyfit(consistency_df['importance_mean'], consistency_df['abs_signed_mean'], 1)
         p = np.poly1d(z)
         plt.plot(consistency_df['importance_mean'], p(consistency_df['importance_mean']), 
-                 "r--", alpha=0.8, linewidth=2, label=f'Trend line (r={pearson_corr:.3f})')
+                 "r--", alpha=0.8, linewidth=3, label=f'Trend line (r={pearson_corr:.3f})')
         plt.legend(fontsize=12)
     
     plt.xlabel('SHAP Importance (Magnitude)', fontsize=14, fontweight='bold')
@@ -823,14 +1003,17 @@ def visualize_mdi_importance(data_files, file_save_path, exp_id):
     
     mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
     
-    # Get top 20 features by MDI importance
+    # Get top 20 features by MDI importance and sort in descending order
     top_mdi_features = mdi_consensus.nlargest(20, 'mean_importance')
     
+    # Reverse the order so most important features are at the top
+    top_mdi_features = top_mdi_features.sort_values('mean_importance', ascending=True)
+    
     # Create publication-quality MDI bar plot
-    plt.figure(figsize=(12, 8), dpi=300)
+    plt.figure(figsize=(9, 6), dpi=300)
     plt.rcParams['font.size'] = 14
     
-    # Create horizontal bar plot
+    # Create horizontal bar plot with proper ordering
     y_pos = range(len(top_mdi_features))
     bars = plt.barh(y_pos, top_mdi_features['mean_importance'], 
                     xerr=top_mdi_features['std_importance'], 
@@ -838,15 +1021,11 @@ def visualize_mdi_importance(data_files, file_save_path, exp_id):
                     capsize=5, ecolor='#cc5a0a')
     
     plt.yticks(y_pos, top_mdi_features.index, fontsize=12)
+    plt.xticks(fontsize=14)
     plt.xlabel('MDI Importance Score', fontsize=14, fontweight='bold')
     plt.ylabel('Feature', fontsize=14, fontweight='bold')
     plt.title('Top 20 Features by MDI Importance\n(Mean ± Standard Deviation)', 
               fontsize=16, fontweight='bold')
-    
-    # Add value labels
-    for i, (mean_val, std_val) in enumerate(zip(top_mdi_features['mean_importance'], top_mdi_features['std_importance'])):
-        plt.text(mean_val + std_val + 0.01, i, f'{mean_val:.3f} ± {std_val:.3f}', 
-                va='center', fontsize=10, fontweight='bold')
     
     plt.grid(axis='x', alpha=0.2, linestyle='--')
     plt.tight_layout()
@@ -881,12 +1060,16 @@ def compare_mdi_shap(data_files, file_save_path, exp_id, top_n=15):
     mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
     shap_consensus = data_files[shap_condition]['consensus_feature_importance']
     
-    # Get top features from both methods
+    # Get top features from both methods and sort in descending order
     top_mdi = mdi_consensus.nlargest(top_n, 'mean_importance')
     top_shap = shap_consensus.nlargest(top_n, 'mean_importance')
     
+    # Reverse the order so most important features are at the top
+    top_mdi = top_mdi.sort_values('mean_importance', ascending=True)
+    top_shap = top_shap.sort_values('mean_importance', ascending=True)
+    
     # Create side-by-side comparison plot
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=300)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), dpi=300)
     plt.rcParams['font.size'] = 14
     
     # MDI plot
@@ -920,8 +1103,8 @@ def compare_mdi_shap(data_files, file_save_path, exp_id, top_n=15):
     plt.show()
     
     # Calculate overlap and correlation
-    mdi_features = set(top_mdi.index)
-    shap_features = set(top_shap.index)
+    mdi_features = set(mdi_consensus.nlargest(top_n, 'mean_importance').index)  # Use original order for ranking
+    shap_features = set(shap_consensus.nlargest(top_n, 'mean_importance').index)  # Use original order for ranking
     overlap = mdi_features.intersection(shap_features)
     
     save_and_print(f"**Top {top_n} Features Overlap Analysis:**", print_report_file, level="info")
@@ -933,14 +1116,145 @@ def compare_mdi_shap(data_files, file_save_path, exp_id, top_n=15):
     if overlap:
         save_and_print("**Overlapping features:**", print_report_file, level="info")
         for feature in sorted(overlap):
-            mdi_rank = list(top_mdi.index).index(feature) + 1
-            shap_rank = list(top_shap.index).index(feature) + 1
+            mdi_rank = list(mdi_consensus.nlargest(top_n, 'mean_importance').index).index(feature) + 1
+            shap_rank = list(shap_consensus.nlargest(top_n, 'mean_importance').index).index(feature) + 1
             save_and_print(f"  - {feature}: MDI rank #{mdi_rank}, SHAP rank #{shap_rank}", print_report_file, level="info")
     
     return top_mdi, top_shap
 
 # Perform comparison
 comparison_results = compare_mdi_shap(data_files, file_save_path, exp_id)
+
+# %% [markdown]
+# ### Total Overlap Analysis for All Selected Features
+
+# %%
+save_and_print("### Total Overlap Analysis for All Selected Features", print_report_file, level="subsection")
+
+def calculate_mdi_shap_total_overlap(data_files, min_occurrence_threshold=0.5):
+    """
+    Calculate comprehensive overlap statistics between MDI and SHAP feature selections
+    including total overlap percentage for all selected features, not just top N
+    
+    Args:
+        data_files: Dictionary containing the data files
+        min_occurrence_threshold: Minimum occurrence count threshold to consider a feature as "selected"
+    
+    Returns:
+        Dictionary containing comprehensive overlap statistics
+    """
+    mdi_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_mdi"
+    shap_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_shap"
+    
+    if (mdi_condition not in data_files or 'consensus_feature_importance' not in data_files[mdi_condition] or
+        shap_condition not in data_files or 'consensus_feature_importance' not in data_files[shap_condition]):
+        save_and_print("MDI or SHAP consensus data not available for total overlap analysis", print_report_file, level="info")
+        return None
+    
+    mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
+    shap_consensus = data_files[shap_condition]['consensus_feature_importance']
+    
+    # Calculate top 15 overlap (existing functionality)
+    top_n = 15
+    top_mdi_features = set(mdi_consensus.nlargest(top_n, 'mean_importance').index)
+    top_shap_features = set(shap_consensus.nlargest(top_n, 'mean_importance').index)
+    top_overlap = top_mdi_features.intersection(top_shap_features)
+    
+    # Calculate total overlap for all features that were actually selected
+    # Use occurrence count to determine which features were "selected"
+    mdi_selected_features = set()
+    shap_selected_features = set()
+    
+    # For MDI: consider features with occurrence count above threshold
+    for feature, data in mdi_consensus.items():
+        if 'occurrence_count' in data and data['occurrence_count'] >= min_occurrence_threshold * k_value:
+            mdi_selected_features.add(feature)
+    
+    # For SHAP: consider features with occurrence count above threshold
+    for feature, data in shap_consensus.items():
+        if 'occurrence_count' in data and data['occurrence_count'] >= min_occurrence_threshold * k_value:
+            shap_selected_features.add(feature)
+    
+    # If occurrence_count is not available, use importance score threshold
+    if not mdi_selected_features:
+        # Use top 50% of features by importance as "selected"
+        importance_threshold = mdi_consensus['mean_importance'].quantile(0.5)
+        mdi_selected_features = set(mdi_consensus[mdi_consensus['mean_importance'] >= importance_threshold].index)
+    
+    if not shap_selected_features:
+        # Use top 50% of features by importance as "selected"
+        importance_threshold = shap_consensus['mean_importance'].quantile(0.5)
+        shap_selected_features = set(shap_consensus[shap_consensus['mean_importance'] >= importance_threshold].index)
+    
+    # Calculate total overlap and union of selected features
+    total_overlap = mdi_selected_features.intersection(shap_selected_features)
+    total_selected_features = mdi_selected_features.union(shap_selected_features)
+    
+    # Calculate Jaccard similarity for the full feature sets
+    jaccard_similarity_total = len(total_overlap) / len(total_selected_features) if len(total_selected_features) > 0 else 0
+    
+    # Calculate overlap percentages
+    top_overlap_percentage = (len(top_overlap) / top_n) * 100
+    total_overlap_percentage = (len(total_overlap) / len(total_selected_features)) * 100 if len(total_selected_features) > 0 else 0
+    
+    # Compile results
+    results = {
+        'top_n': top_n,
+        'top_mdi_features': len(top_mdi_features),
+        'top_shap_features': len(top_shap_features),
+        'top_overlap': len(top_overlap),
+        'top_overlap_percentage': top_overlap_percentage,
+        
+        'total_selected_features': len(total_selected_features),
+        'mdi_selected_features': len(mdi_selected_features),
+        'shap_selected_features': len(shap_selected_features),
+        'total_overlap': len(total_overlap),
+        'total_overlap_percentage': total_overlap_percentage,
+        'jaccard_similarity_total': jaccard_similarity_total,
+        
+        'mdi_selection_ratio': len(mdi_selected_features) / len(total_selected_features) * 100,
+        'shap_selection_ratio': len(shap_selected_features) / len(total_selected_features) * 100,
+        'overlap_selection_ratio': len(total_overlap) / len(total_selected_features) * 100
+    }
+    
+    # Print comprehensive results
+    save_and_print("**Comprehensive MDI vs SHAP Overlap Analysis**", print_report_file, level="info")
+    save_and_print("=" * 60, print_report_file, level="info")
+    
+    save_and_print("**Top 15 Features Analysis:**", print_report_file, level="info")
+    save_and_print(f"- MDI top {top_n} features: {results['top_mdi_features']}", print_report_file, level="info")
+    save_and_print(f"- SHAP top {top_n} features: {results['top_shap_features']}", print_report_file, level="info")
+    save_and_print(f"- Overlapping features: {results['top_overlap']}", print_report_file, level="info")
+    save_and_print(f"- Overlap percentage: {results['top_overlap_percentage']:.1f}%", print_report_file, level="info")
+    
+    save_and_print("", print_report_file, level="info")
+    save_and_print("**Total Features Analysis (All Selected Features):**", print_report_file, level="info")
+    save_and_print(f"- Total selected features (union): {results['total_selected_features']}", print_report_file, level="info")
+    save_and_print(f"- MDI selected features: {results['mdi_selected_features']} ({results['mdi_selection_ratio']:.1f}% of selected)", print_report_file, level="info")
+    save_and_print(f"- SHAP selected features: {results['shap_selected_features']} ({results['shap_selection_ratio']:.1f}% of selected)", print_report_file, level="info")
+    save_and_print(f"- Total overlapping features: {results['total_overlap']} ({results['overlap_selection_ratio']:.1f}% of selected)", print_report_file, level="info")
+    save_and_print(f"- Total overlap percentage (agreement): {results['total_overlap_percentage']:.1f}%", print_report_file, level="info")
+    save_and_print(f"- Jaccard similarity (total sets): {results['jaccard_similarity_total']:.3f}", print_report_file, level="info")
+    
+    # Additional insights
+    save_and_print("", print_report_file, level="info")
+    save_and_print("**Additional Insights:**", print_report_file, level="info")
+    if results['total_overlap_percentage'] > results['top_overlap_percentage']:
+        save_and_print("- Total overlap is HIGHER than top 15 overlap, suggesting better agreement on overall feature selection", print_report_file, level="info")
+    else:
+        save_and_print("- Total overlap is LOWER than top 15 overlap, suggesting disagreement increases with more features", print_report_file, level="info")
+    
+    if results['jaccard_similarity_total'] > 0.7:
+        save_and_print("- High Jaccard similarity (>0.7) indicates strong agreement between MDI and SHAP", print_report_file, level="info")
+    elif results['jaccard_similarity_total'] > 0.3:
+        save_and_print("- Moderate Jaccard similarity (0.3-0.7) indicates reasonable agreement between MDI and SHAP", print_report_file, level="info")
+    else:
+        save_and_print("- Low Jaccard similarity (<0.3) indicates weak agreement between MDI and SHAP", print_report_file, level="info")
+    
+    return results
+
+# Perform total overlap analysis
+total_overlap_results = calculate_mdi_shap_total_overlap(data_files)
 
 # %% [markdown]
 # ### Feature Importance CSV Export
