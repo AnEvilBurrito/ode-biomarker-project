@@ -559,9 +559,11 @@ for condition, files in data_files.items():
 # %%
 # Create publication-quality convergence plots as separate figures
 plt.rcParams['font.size'] = 14
+plt.rcParams["xtick.labelsize"] = 14  # Set x-tick size
+plt.rcParams["ytick.labelsize"] = 14  # Set y-tick size
 
 # Plot 1: Individual convergence curves (separate file)
-plt.figure(figsize=(8, 5), dpi=300)
+plt.figure(figsize=(6, 4), dpi=300)
 
 for condition, files in data_files.items():
     if 'meta_results' not in files:
@@ -588,7 +590,7 @@ plt.show()
 save_and_print("Created individual convergence curves plot", print_report_file, level="info")
 
 # Plot 2: Comparative convergence (normalized iterations) - separate file
-plt.figure(figsize=(8, 5), dpi=300)
+plt.figure(figsize=(6, 4), dpi=300)
 
 for condition, files in data_files.items():
     if 'meta_results' not in files:
@@ -618,7 +620,7 @@ plt.show()
 save_and_print("Created comparative convergence plot", print_report_file, level="info")
 
 # Plot 3: Convergence AUC comparison (separate file)
-plt.figure(figsize=(8, 6), dpi=300)
+plt.figure(figsize=(6, 4), dpi=300)
 
 methods = []
 auc_values = []
@@ -730,6 +732,69 @@ def analyze_shap_signed_values(data_files):
 shap_signed_analysis = analyze_shap_signed_values(data_files)
 
 # %% [markdown]
+# ### SHAP Directional Features Export
+# %%
+def export_shap_directional_features(shap_signed_analysis, file_save_path, exp_id):
+    """
+    Export SHAP features with positive and negative directional effects to separate CSV files
+    following the same format as existing feature importance exports for compatibility
+    """
+    if shap_signed_analysis is None:
+        save_and_print("No SHAP signed analysis data available for export", print_report_file, level="info")
+        return None
+    
+    positive_effects = shap_signed_analysis['positive_effects']
+    negative_effects = shap_signed_analysis['negative_effects']
+    
+    # Rename columns for compatibility with existing exports
+    positive_export = positive_effects[['mean_importance_signed', 'std_importance_signed', 'occurrence_count']].copy()
+    negative_export = negative_effects[['mean_importance_signed', 'std_importance_signed', 'occurrence_count']].copy()
+    
+    # Rename columns to match existing format
+    positive_export = positive_export.rename(columns={
+        'mean_importance_signed': 'mean_importance',
+        'std_importance_signed': 'std_importance'
+    })
+    negative_export = negative_export.rename(columns={
+        'mean_importance_signed': 'mean_importance',
+        'std_importance_signed': 'std_importance'
+    })
+    
+    # Convert negative values to absolute values for negative effects export
+    negative_export['mean_importance'] = negative_export['mean_importance'].abs()
+    
+    # Sort by absolute value of mean_importance (most impactful first)
+    positive_export['abs_importance'] = positive_export['mean_importance'].abs()
+    negative_export['abs_importance'] = negative_export['mean_importance'].abs()
+    
+    positive_export = positive_export.sort_values('abs_importance', ascending=False)
+    negative_export = negative_export.sort_values('abs_importance', ascending=False)
+    
+    # Remove the temporary abs_importance column before export
+    positive_export = positive_export.drop('abs_importance', axis=1)
+    negative_export = negative_export.drop('abs_importance', axis=1)
+    
+    # Export positive effects
+    positive_csv_path = f"{file_save_path}shap_positive_effects_{exp_id}.csv"
+    positive_export.to_csv(positive_csv_path)
+    
+    # Export negative effects  
+    negative_csv_path = f"{file_save_path}shap_negative_effects_{exp_id}.csv"
+    negative_export.to_csv(negative_csv_path)
+    
+    save_and_print("### SHAP Directional Features Export", print_report_file, level="subsection")
+    save_and_print(f"✓ Positive effects exported to: {positive_csv_path}", print_report_file, level="info")
+    save_and_print(f"  - Features with positive effect: {len(positive_export)}", print_report_file, level="info")
+    save_and_print(f"✓ Negative effects exported to: {negative_csv_path}", print_report_file, level="info")
+    save_and_print(f"  - Features with negative effect: {len(negative_export)}", print_report_file, level="info")
+    save_and_print("  - Column names: mean_importance, std_importance, occurrence_count (compatible with existing exports)", print_report_file, level="info")
+    
+    return positive_csv_path, negative_csv_path
+
+# Export SHAP directional features
+shap_directional_export = export_shap_directional_features(shap_signed_analysis, file_save_path, exp_id)
+
+# %% [markdown]
 # ### SHAP Signed Values Visualization
 
 # %%
@@ -745,8 +810,10 @@ if shap_signed_analysis is not None:
                    print_report_file, level="info")
     
     # Create publication-quality SHAP signed values visualization
-    plt.figure(figsize=(12, 8), dpi=300)
     plt.rcParams['font.size'] = 14
+    plt.rcParams['xtick.labelsize'] = 14  # Set x-tick size
+    plt.rcParams['ytick.labelsize'] = 14  # Set y-tick size
+    plt.figure(figsize=(10,6), dpi=300)
     
     # Create directional importance plot
     # Take top 20 features by ABSOLUTE importance (both positive and negative)
@@ -810,7 +877,7 @@ if shap_signed_analysis is not None:
                    print_report_file, level="info")
     
     # Create enhanced distribution plot of signed values
-    plt.figure(figsize=(10, 6), dpi=300)
+    plt.figure(figsize=(8,5), dpi=300)
     
     # Create histogram with better binning for signed values
     values = signed_consensus['mean_importance_signed']
@@ -930,9 +997,10 @@ if shap_consistency_results is not None:
     consistency_df, pearson_corr, spearman_corr = shap_consistency_results
     
     # Create publication-quality scatter plot
-    plt.figure(figsize=(7, 6), dpi=300)
     plt.rcParams['font.size'] = 14
-    
+    plt.figure(figsize=(7, 6), dpi=300)
+    plt.tick_params(axis='x', labelsize=14)
+    plt.tick_params(axis='y', labelsize=14)
     # Scatter plot without error bars: draw points and annotate top features.
     plt.scatter(consistency_df['importance_mean'], consistency_df['abs_signed_mean'],
                 c='#1f77b4', alpha=0.7, s=100, edgecolors='w', linewidth=0.5)
@@ -1021,7 +1089,7 @@ def visualize_mdi_importance(data_files, file_save_path, exp_id):
                     capsize=5, ecolor='#cc5a0a')
     
     plt.yticks(y_pos, top_mdi_features.index, fontsize=12)
-    plt.xticks(fontsize=14)
+    plt.xticks(fontsize=16)
     plt.xlabel('MDI Importance Score', fontsize=14, fontweight='bold')
     plt.ylabel('Feature', fontsize=14, fontweight='bold')
     plt.title('Top 20 Features by MDI Importance\n(Mean ± Standard Deviation)', 
@@ -1097,7 +1165,13 @@ def compare_mdi_shap(data_files, file_save_path, exp_id, top_n=15):
     ax2.set_xlabel('SHAP Importance Score', fontsize=12, fontweight='bold')
     ax2.set_title('Top Features by SHAP', fontsize=14, fontweight='bold')
     ax2.grid(axis='x', alpha=0.2, linestyle='--')
-    
+
+    # Set tick sizes for both axes
+    ax1.tick_params(axis="x", labelsize=14)  # X-axis ticks for MDI
+    ax1.tick_params(axis="y", labelsize=12)  # Y-axis ticks for MDI
+    ax2.tick_params(axis="x", labelsize=14)  # X-axis ticks for SHAP
+    ax2.tick_params(axis="y", labelsize=12)  # Y-axis ticks for SHAP
+
     plt.tight_layout()
     plt.savefig(f"{file_save_path}mdi_shap_comparison_{exp_id}.png", dpi=300, bbox_inches='tight')
     plt.show()
@@ -1124,6 +1198,58 @@ def compare_mdi_shap(data_files, file_save_path, exp_id, top_n=15):
 
 # Perform comparison
 comparison_results = compare_mdi_shap(data_files, file_save_path, exp_id)
+
+# %% [markdown]
+# ### Shared Feature Selection Method
+
+# %%
+def get_selected_features(mdi_consensus, shap_consensus, min_occurrence_threshold=0.5, k_value=500):
+    """
+    Get selected features from MDI and SHAP consensus data using consistent threshold logic
+    
+    Args:
+        mdi_consensus: MDI consensus feature importance data
+        shap_consensus: SHAP consensus feature importance data
+        min_occurrence_threshold: Minimum occurrence ratio threshold (default: 0.5 = 50%)
+        k_value: Total number of iterations (default: 500)
+    
+    Returns:
+        Dictionary containing selected feature sets and counts
+    """
+    mdi_selected_features = set()
+    shap_selected_features = set()
+    
+    # For MDI: consider features with occurrence count above threshold
+    for feature, data in mdi_consensus.items():
+        if 'occurrence_count' in data and data['occurrence_count'] >= min_occurrence_threshold * k_value:
+            mdi_selected_features.add(feature)
+    
+    # For SHAP: consider features with occurrence count above threshold
+    for feature, data in shap_consensus.items():
+        if 'occurrence_count' in data and data['occurrence_count'] >= min_occurrence_threshold * k_value:
+            shap_selected_features.add(feature)
+    
+    # If occurrence_count is not available, use importance score threshold (fallback)
+    if not mdi_selected_features:
+        importance_threshold = mdi_consensus['mean_importance'].quantile(0.5)
+        mdi_selected_features = set(mdi_consensus[mdi_consensus['mean_importance'] >= importance_threshold].index)
+    
+    if not shap_selected_features:
+        importance_threshold = shap_consensus['mean_importance'].quantile(0.5)
+        shap_selected_features = set(shap_consensus[shap_consensus['mean_importance'] >= importance_threshold].index)
+    
+    # Calculate union and intersection
+    total_selected_features = mdi_selected_features.union(shap_selected_features)
+    total_overlap = mdi_selected_features.intersection(shap_selected_features)
+    
+    return {
+        'mdi_selected': mdi_selected_features,
+        'shap_selected': shap_selected_features,
+        'total_selected': total_selected_features,
+        'overlap': total_overlap,
+        'threshold': min_occurrence_threshold,
+        'k_value': k_value
+    }
 
 # %% [markdown]
 # ### Total Overlap Analysis for All Selected Features
@@ -1154,41 +1280,20 @@ def calculate_mdi_shap_total_overlap(data_files, min_occurrence_threshold=0.5):
     mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
     shap_consensus = data_files[shap_condition]['consensus_feature_importance']
     
+    # Use the shared feature selection method
+    selected_features = get_selected_features(mdi_consensus, shap_consensus, min_occurrence_threshold, k_value)
+    
     # Calculate top 15 overlap (existing functionality)
     top_n = 15
     top_mdi_features = set(mdi_consensus.nlargest(top_n, 'mean_importance').index)
     top_shap_features = set(shap_consensus.nlargest(top_n, 'mean_importance').index)
     top_overlap = top_mdi_features.intersection(top_shap_features)
     
-    # Calculate total overlap for all features that were actually selected
-    # Use occurrence count to determine which features were "selected"
-    mdi_selected_features = set()
-    shap_selected_features = set()
-    
-    # For MDI: consider features with occurrence count above threshold
-    for feature, data in mdi_consensus.items():
-        if 'occurrence_count' in data and data['occurrence_count'] >= min_occurrence_threshold * k_value:
-            mdi_selected_features.add(feature)
-    
-    # For SHAP: consider features with occurrence count above threshold
-    for feature, data in shap_consensus.items():
-        if 'occurrence_count' in data and data['occurrence_count'] >= min_occurrence_threshold * k_value:
-            shap_selected_features.add(feature)
-    
-    # If occurrence_count is not available, use importance score threshold
-    if not mdi_selected_features:
-        # Use top 50% of features by importance as "selected"
-        importance_threshold = mdi_consensus['mean_importance'].quantile(0.5)
-        mdi_selected_features = set(mdi_consensus[mdi_consensus['mean_importance'] >= importance_threshold].index)
-    
-    if not shap_selected_features:
-        # Use top 50% of features by importance as "selected"
-        importance_threshold = shap_consensus['mean_importance'].quantile(0.5)
-        shap_selected_features = set(shap_consensus[shap_consensus['mean_importance'] >= importance_threshold].index)
-    
-    # Calculate total overlap and union of selected features
-    total_overlap = mdi_selected_features.intersection(shap_selected_features)
-    total_selected_features = mdi_selected_features.union(shap_selected_features)
+    # Extract selected features from the shared method
+    mdi_selected_features = selected_features['mdi_selected']
+    shap_selected_features = selected_features['shap_selected']
+    total_selected_features = selected_features['total_selected']
+    total_overlap = selected_features['overlap']
     
     # Calculate Jaccard similarity for the full feature sets
     jaccard_similarity_total = len(total_overlap) / len(total_selected_features) if len(total_selected_features) > 0 else 0
@@ -1214,8 +1319,15 @@ def calculate_mdi_shap_total_overlap(data_files, min_occurrence_threshold=0.5):
         
         'mdi_selection_ratio': len(mdi_selected_features) / len(total_selected_features) * 100,
         'shap_selection_ratio': len(shap_selected_features) / len(total_selected_features) * 100,
-        'overlap_selection_ratio': len(total_overlap) / len(total_selected_features) * 100
+        'overlap_selection_ratio': len(total_overlap) / len(total_selected_features) * 100,
+        'threshold_used': min_occurrence_threshold
     }
+    
+    # Print comprehensive results
+    save_and_print("**Comprehensive MDI vs SHAP Overlap Analysis**", print_report_file, level="info")
+    save_and_print("=" * 60, print_report_file, level="info")
+    save_and_print(f"**Threshold used**: {min_occurrence_threshold} (minimum occurrence ratio)", print_report_file, level="info")
+    save_and_print("", print_report_file, level="info")
     
     # Print comprehensive results
     save_and_print("**Comprehensive MDI vs SHAP Overlap Analysis**", print_report_file, level="info")
@@ -1262,9 +1374,16 @@ total_overlap_results = calculate_mdi_shap_total_overlap(data_files)
 # %%
 save_and_print("### Feature Importance CSV Export", print_report_file, level="subsection")
 
-def export_feature_importance_csv(data_files, file_save_path, exp_id, top_n=50):
+def export_feature_importance_csv(data_files, file_save_path, exp_id, top_n=50, min_occurrence_threshold=0.5):
     """
-    Export comprehensive feature importance data to CSV
+    Export comprehensive feature importance data to CSV files using consistent threshold logic
+    
+    Args:
+        data_files: Dictionary containing the data files
+        file_save_path: Path to save CSV files
+        exp_id: Experiment identifier
+        top_n: Number of top features to consider for top-N analysis
+        min_occurrence_threshold: Minimum occurrence ratio threshold for feature selection (default: 0.5 = 50%)
     """
     mdi_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_mdi"
     shap_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_shap"
@@ -1277,13 +1396,16 @@ def export_feature_importance_csv(data_files, file_save_path, exp_id, top_n=50):
     mdi_consensus = data_files[mdi_condition]['consensus_feature_importance']
     shap_consensus = data_files[shap_condition]['consensus_feature_importance']
     
-    # Create comprehensive feature importance dataframe
+    # Use the shared feature selection method for consistent counting
+    selected_features = get_selected_features(mdi_consensus, shap_consensus, min_occurrence_threshold, k_value)
+    
+    # Create comprehensive feature importance dataframe (combined) - ALL features
     feature_importance_df = pd.DataFrame()
     
     # Get all unique features from both methods
     all_features = set(mdi_consensus.index) | set(shap_consensus.index)
     
-    # Create dataframe with importance scores
+    # Create dataframe with importance scores for ALL features
     for feature in all_features:
         mdi_data = mdi_consensus.loc[feature] if feature in mdi_consensus.index else pd.Series({'mean_importance': np.nan, 'std_importance': np.nan})
         shap_data = shap_consensus.loc[feature] if feature in shap_consensus.index else pd.Series({'mean_importance': np.nan, 'std_importance': np.nan})
@@ -1292,6 +1414,12 @@ def export_feature_importance_csv(data_files, file_save_path, exp_id, top_n=50):
         feature_importance_df.loc[feature, 'mdi_std_importance'] = mdi_data.get('std_importance', np.nan)
         feature_importance_df.loc[feature, 'shap_mean_importance'] = shap_data.get('mean_importance', np.nan)
         feature_importance_df.loc[feature, 'shap_std_importance'] = shap_data.get('std_importance', np.nan)
+        
+        # Add occurrence counts if available
+        if 'occurrence_count' in mdi_data:
+            feature_importance_df.loc[feature, 'mdi_occurrence_count'] = mdi_data.get('occurrence_count', np.nan)
+        if 'occurrence_count' in shap_data:
+            feature_importance_df.loc[feature, 'shap_occurrence_count'] = shap_data.get('occurrence_count', np.nan)
     
     # Calculate rankings
     feature_importance_df['mdi_rank'] = feature_importance_df['mdi_mean_importance'].rank(ascending=False, method='min')
@@ -1305,27 +1433,78 @@ def export_feature_importance_csv(data_files, file_save_path, exp_id, top_n=50):
     top_n_shap = set(feature_importance_df.nsmallest(top_n, 'shap_rank').index)
     feature_importance_df['in_top_both'] = feature_importance_df.index.isin(top_n_mdi & top_n_shap)
     
+    # Add selected feature indicator using the shared threshold logic
+    feature_importance_df['mdi_selected'] = feature_importance_df.index.isin(selected_features['mdi_selected'])
+    feature_importance_df['shap_selected'] = feature_importance_df.index.isin(selected_features['shap_selected'])
+    feature_importance_df['both_selected'] = feature_importance_df.index.isin(selected_features['overlap'])
+    
     # Sort by MDI importance (most important first)
     feature_importance_df = feature_importance_df.sort_values('mdi_mean_importance', ascending=False)
     
-    # Save to CSV
-    csv_path = f"{file_save_path}feature_importance_comprehensive_{exp_id}.csv"
-    feature_importance_df.to_csv(csv_path)
+    # Save combined CSV (ALL features)
+    combined_csv_path = f"{file_save_path}feature_importance_comprehensive_{exp_id}.csv"
+    feature_importance_df.to_csv(combined_csv_path)
     
-    save_and_print(f"Comprehensive feature importance data exported to: {csv_path}", print_report_file, level="info")
-    save_and_print(f"Total features exported: {len(feature_importance_df)}", print_report_file, level="info")
-    save_and_print(f"Features in top {top_n} of both methods: {feature_importance_df['in_top_both'].sum()}", print_report_file, level="info")
+    save_and_print(f"✓ Combined feature importance data exported to: {combined_csv_path}", print_report_file, level="info")
+    save_and_print(f"  Total features in combined file: {len(feature_importance_df)}", print_report_file, level="info")
     
-    # Print summary statistics
+    # Create CSV for selected features only (using consistent threshold)
+    selected_features_df = feature_importance_df[feature_importance_df['mdi_selected'] | feature_importance_df['shap_selected']].copy()
+    selected_csv_path = f"{file_save_path}feature_importance_selected_{exp_id}.csv"
+    selected_features_df.to_csv(selected_csv_path)
+    
+    save_and_print(f"✓ Selected features data exported to: {selected_csv_path}", print_report_file, level="info")
+    save_and_print(f"  Total selected features: {len(selected_features_df)}", print_report_file, level="info")
+    save_and_print(f"  Threshold used: {min_occurrence_threshold} (minimum occurrence ratio)", print_report_file, level="info")
+    
+    # Create separate MDI-only CSV
+    mdi_df = pd.DataFrame()
+    for feature in mdi_consensus.index:
+        mdi_data = mdi_consensus.loc[feature]
+        mdi_df.loc[feature, 'mean_importance'] = mdi_data.get('mean_importance', np.nan)
+        mdi_df.loc[feature, 'std_importance'] = mdi_data.get('std_importance', np.nan)
+        if 'occurrence_count' in mdi_data:
+            mdi_df.loc[feature, 'occurrence_count'] = mdi_data.get('occurrence_count', np.nan)
+    
+    mdi_df = mdi_df.sort_values('mean_importance', ascending=False)
+    mdi_csv_path = f"{file_save_path}mdi_feature_importance_{exp_id}.csv"
+    mdi_df.to_csv(mdi_csv_path)
+    
+    save_and_print(f"✓ MDI-only feature importance data exported to: {mdi_csv_path}", print_report_file, level="info")
+    save_and_print(f"  Total MDI features: {len(mdi_df)}", print_report_file, level="info")
+    
+    # Create separate SHAP-only CSV
+    shap_df = pd.DataFrame()
+    for feature in shap_consensus.index:
+        shap_data = shap_consensus.loc[feature]
+        shap_df.loc[feature, 'mean_importance'] = shap_data.get('mean_importance', np.nan)
+        shap_df.loc[feature, 'std_importance'] = shap_data.get('std_importance', np.nan)
+        if 'occurrence_count' in shap_data:
+            shap_df.loc[feature, 'occurrence_count'] = shap_data.get('occurrence_count', np.nan)
+    
+    shap_df = shap_df.sort_values('mean_importance', ascending=False)
+    shap_csv_path = f"{file_save_path}shap_feature_importance_{exp_id}.csv"
+    shap_df.to_csv(shap_csv_path)
+    
+    save_and_print(f"✓ SHAP-only feature importance data exported to: {shap_csv_path}", print_report_file, level="info")
+    save_and_print(f"  Total SHAP features: {len(shap_df)}", print_report_file, level="info")
+    
+    # Print summary statistics with consistent counting
     save_and_print("**Feature Importance Summary Statistics:**", print_report_file, level="info")
+    save_and_print(f"- Total features analyzed: {len(feature_importance_df)}", print_report_file, level="info")
+    save_and_print(f"- Selected features (threshold={min_occurrence_threshold}): {len(selected_features_df)}", print_report_file, level="info")
     save_and_print(f"- MDI mean importance: {feature_importance_df['mdi_mean_importance'].mean():.4f} ± {feature_importance_df['mdi_mean_importance'].std():.4f}", print_report_file, level="info")
     save_and_print(f"- SHAP mean importance: {feature_importance_df['shap_mean_importance'].mean():.4f} ± {feature_importance_df['shap_mean_importance'].std():.4f}", print_report_file, level="info")
     save_and_print(f"- Average rank difference: {feature_importance_df['rank_difference'].mean():.1f} ± {feature_importance_df['rank_difference'].std():.1f}", print_report_file, level="info")
+    save_and_print(f"- Features in top {top_n} of both methods: {feature_importance_df['in_top_both'].sum()}", print_report_file, level="info")
+    save_and_print(f"- MDI selected features: {len(selected_features['mdi_selected'])}", print_report_file, level="info")
+    save_and_print(f"- SHAP selected features: {len(selected_features['shap_selected'])}", print_report_file, level="info")
+    save_and_print(f"- Overlapping selected features: {len(selected_features['overlap'])}", print_report_file, level="info")
     
-    return feature_importance_df
+    return feature_importance_df, selected_features_df, mdi_df, shap_df
 
-# Export feature importance data
-feature_importance_export = export_feature_importance_csv(data_files, file_save_path, exp_id)
+# Export feature importance data with consistent threshold logic
+feature_importance_export = export_feature_importance_csv(data_files, file_save_path, exp_id, min_occurrence_threshold=0.5)
 
 # %% [markdown]
 # ## Comprehensive Results Summary
@@ -1390,114 +1569,6 @@ if shap_signed_analysis is not None:
     positive_count = len(shap_signed_analysis['positive_effects'])
     negative_count = len(shap_signed_analysis['negative_effects'])
     save_and_print(f"3. **SHAP reveals directional effects**: {positive_count} features have positive impact, {negative_count} have negative impact", print_report_file, level="info")
-
-# %% [markdown]
-# ## Final Visualizations
-
-# %%
-save_and_print("## Final Comprehensive Visualization", print_report_file, level="section")
-
-# Create a comprehensive comparison plot
-plt.figure(figsize=(15, 10), dpi=300)
-plt.rcParams['font.size'] = 14
-
-# Create 2x2 subplot grid
-fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-
-# Plot 1: Jaccard stability comparison (top-left)
-ax1 = axes[0, 0]
-methods = []
-stability_means = []
-stability_stds = []
-
-for condition in conditions:
-    if condition in stability_results_all[50]:
-        methods.append('SHAP' if 'shap' in condition else 'MDI')
-        stability_means.append(stability_results_all[50][condition]['mean_jaccard'])
-        stability_stds.append(stability_results_all[50][condition]['std_jaccard'])
-
-bars = ax1.bar(methods, stability_means, yerr=stability_stds, capsize=10,
-               color=[color_mapping['shap'] if m == 'SHAP' else color_mapping['mdi'] for m in methods],
-               alpha=0.8, edgecolor='black', linewidth=1)
-
-ax1.set_title('Feature Selection Stability\n(Jaccard Similarity, Top 50 Features)', 
-              fontsize=14, fontweight='bold')
-ax1.set_ylabel('Mean Jaccard Similarity', fontsize=12, fontweight='bold')
-ax1.set_ylim(0, 1)
-ax1.grid(axis='y', alpha=0.2, linestyle='--')
-
-# Add value labels
-for bar, mean in zip(bars, stability_means):
-    ax1.text(bar.get_x() + bar.get_width()/2, mean + 0.02, f'{mean:.3f}', 
-            ha='center', va='bottom', fontsize=11, fontweight='bold')
-
-# Plot 2: Convergence AUC comparison (top-right)
-ax2 = axes[0, 1]
-auc_values = []
-for condition in conditions:
-    if condition in convergence_results:
-        auc_values.append(convergence_results[condition]['auc'])
-
-bars = ax2.bar(methods, auc_values, 
-               color=[color_mapping['shap'] if m == 'SHAP' else color_mapping['mdi'] for m in methods],
-               alpha=0.8, edgecolor='black', linewidth=1)
-
-ax2.set_title('Convergence Performance\n(AUC - Lower is Better)', 
-              fontsize=14, fontweight='bold')
-ax2.set_ylabel('Area Under Curve (AUC)', fontsize=12, fontweight='bold')
-ax2.grid(axis='y', alpha=0.2, linestyle='--')
-
-# Add value labels
-for bar, auc_val in zip(bars, auc_values):
-    ax2.text(bar.get_x() + bar.get_width()/2, auc_val + 0.002, f'{auc_val:.3f}', 
-            ha='center', va='bottom', fontsize=11, fontweight='bold')
-
-# Plot 3: SHAP signed values distribution (bottom-left)
-ax3 = axes[1, 0]
-if shap_signed_analysis is not None:
-    signed_values = shap_signed_analysis['signed_consensus']['mean_importance_signed']
-    ax3.hist(signed_values, bins=30, alpha=0.7, color='purple', edgecolor='black')
-    ax3.axvline(x=0, color='red', linestyle='--', linewidth=2, label='Zero Effect')
-    ax3.set_xlabel('Mean Signed SHAP Value', fontsize=12, fontweight='bold')
-    ax3.set_ylabel('Frequency', fontsize=12, fontweight='bold')
-    ax3.set_title('SHAP Signed Values Distribution', fontsize=14, fontweight='bold')
-    ax3.legend(fontsize=10)
-    ax3.grid(alpha=0.2, linestyle='--')
-else:
-    ax3.text(0.5, 0.5, 'SHAP Signed Values\nNot Available', 
-            ha='center', va='center', transform=ax3.transAxes, fontsize=12)
-    ax3.set_title('SHAP Signed Values Distribution', fontsize=14, fontweight='bold')
-
-# Plot 4: Method comparison summary (bottom-right)
-ax4 = axes[1, 1]
-# Create a simple radar chart-like visualization
-metrics = ['Stability', 'Convergence', 'Interpretability']
-shap_scores = [0.8, 0.7, 0.9]  # Placeholder scores
-mdi_scores = [0.6, 0.8, 0.3]   # Placeholder scores
-
-angles = np.linspace(0, 2*np.pi, len(metrics), endpoint=False)
-angles = np.concatenate((angles, [angles[0]]))  # Close the circle
-
-shap_scores = np.concatenate((shap_scores, [shap_scores[0]]))
-mdi_scores = np.concatenate((mdi_scores, [mdi_scores[0]]))
-
-ax4.plot(angles, shap_scores, 'o-', linewidth=2, label='SHAP', color=color_mapping['shap'])
-ax4.plot(angles, mdi_scores, 'o-', linewidth=2, label='MDI', color=color_mapping['mdi'])
-ax4.fill(angles, shap_scores, alpha=0.25, color=color_mapping['shap'])
-ax4.fill(angles, mdi_scores, alpha=0.25, color=color_mapping['mdi'])
-
-ax4.set_xticks(angles[:-1])
-ax4.set_xticklabels(metrics, fontsize=10)
-ax4.set_ylim(0, 1)
-ax4.set_title('Method Comparison Summary', fontsize=14, fontweight='bold')
-ax4.legend(loc='upper right', fontsize=10)
-ax4.grid(True)
-
-plt.tight_layout()
-plt.savefig(f"{file_save_path}comprehensive_comparison_{exp_id}.png", dpi=300, bbox_inches='tight')
-plt.show()
-
-save_and_print("Created comprehensive comparison visualization", print_report_file, level="info")
 
 # %% [markdown]
 # ## Conclusion

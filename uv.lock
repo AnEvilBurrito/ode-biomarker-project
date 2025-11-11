@@ -1695,7 +1695,7 @@ requires-dist = [
     { name = "jupytext", specifier = ">=1.17.3" },
     { name = "libroadrunner", specifier = ">=2.8.0" },
     { name = "matplotlib", specifier = ">=3.10.7" },
-    { name = "openpyxl", specifier = "==3.0.10" },
+    { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pip", specifier = "==23.1.2" },
     { name = "pip-chill", specifier = "==1.0.3" },
     { name = "pipdeptree", specifier = "==2.13.0" },
@@ -1705,7 +1705,7 @@ requires-dist = [
     { name = "pyvis", specifier = "==0.3.2" },
     { name = "scikeras", specifier = "==0.9.0" },
     { name = "scipy", specifier = ">=1.15.3" },
-    { name = "seaborn", specifier = "==0.11.2" },
+    { name = "seaborn", specifier = "==0.13.2" },
     { name = "session-info", specifier = "==1.0.0" },
     { name = "shap", specifier = "==0.48.0" },
     { name = "sklearn-relief", specifier = "==1.0.0b2" },
@@ -1718,14 +1718,14 @@ requires-dist = [
 
 [[package]]
 name = "openpyxl"
-version = "3.0.10"
+version = "3.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "et-xmlfile" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2c/b8/ff77a718173fd73e49f883b4fda88f11af1fc51edb9252af3785b0cad987/openpyxl-3.0.10.tar.gz", hash = "sha256:e47805627aebcf860edb4edf7987b1309c1b3632f3750538ed962bbcc3bd7449", size = 179688, upload-time = "2022-05-19T15:43:05.252Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/f9/88d94a75de065ea32619465d2f77b29a0469500e99012523b91cc4141cd1/openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050", size = 186464, upload-time = "2024-06-28T14:03:44.161Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/60/9afac4fd6feee0ac09339de4101ee452ea643d26e9ce44c7708a0023f503/openpyxl-3.0.10-py2.py3-none-any.whl", hash = "sha256:0ab6d25d01799f97a9464630abacbb34aafecdcaa0ef3cba6d6b3499867d0355", size = 242144, upload-time = "2022-05-19T15:43:03.065Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/da/977ded879c29cbd04de313843e76868e6e13408a94ed6b987245dc7c8506/openpyxl-3.1.5-py2.py3-none-any.whl", hash = "sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2", size = 250910, upload-time = "2024-06-28T14:03:41.161Z" },
 ]
 
 [[package]]
@@ -2660,17 +2660,16 @@ wheels = [
 
 [[package]]
 name = "seaborn"
-version = "0.11.2"
+version = "0.13.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "pandas" },
-    { name = "scipy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/58/81/51b7ee560a1b01d5c47cae22bfed4e79f1529a08cdff950506097b0d51e1/seaborn-0.11.2.tar.gz", hash = "sha256:cf45e9286d40826864be0e3c066f98536982baf701a7caa386511792d61ff4f6", size = 268839, upload-time = "2021-08-16T00:42:21.015Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/86/59/a451d7420a77ab0b98f7affa3a1d78a313d2f7281a57afb1a34bae8ab412/seaborn-0.13.2.tar.gz", hash = "sha256:93e60a40988f4d65e9f4885df477e2fdaff6b73a9ded434c1ab356dd57eefff7", size = 1457696, upload-time = "2024-01-25T13:21:52.551Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/5b/0479d7d845b5ba410ca702ffcd7f2cd95a14a4dfff1fde2637802b258b9b/seaborn-0.11.2-py3-none-any.whl", hash = "sha256:85a6baa9b55f81a0623abddc4a26b334653ff4c6b18c418361de19dbba0ef283", size = 292819, upload-time = "2021-08-16T00:42:18.576Z" },
+    { url = "https://files.pythonhosted.org/packages/83/11/00d3c3dfc25ad54e731d91449895a79e4bf2384dc3ac01809010ba88f6d5/seaborn-0.13.2-py3-none-any.whl", hash = "sha256:636f8336facf092165e27924f223d3c62ca560b1f2bb5dff7ab7fad265361987", size = 294914, upload-time = "2024-01-25T13:21:49.598Z" },
 ]
 
 [[package]]
