@@ -980,106 +980,172 @@ def create_feature_importance_bar_charts(data_files, top_n=20, save_path=None):
 # Create individual feature importance charts
 create_feature_importance_bar_charts(data_files, top_n=20, save_path=file_save_path)
 
+
 # %% [markdown]
 # ## Comparative Feature Importance Analysis
 
 # %%
-save_and_print("## Comparative Feature Importance Analysis", print_report_file, level="section")
-
 def create_comparative_feature_importance_heatmap(data_files, top_n_features=50, save_path=None):
     """
-    Create comprehensive heatmap showing feature importance patterns across all conditions
+    Create comprehensive heatmap showing feature importance patterns across all conditions,
+    with global normalization, shared colorbars, and compact layout.
     """
     save_and_print("### Feature Importance Heatmap Across All Conditions", print_report_file, level="subsection")
     
-    # Step 1: Extract top features across all conditions
+    # Step 1: Gather top features
     all_top_features = set()
     condition_importance = {}
     
     for condition in conditions:
         if 'consensus_feature_importance' not in data_files[condition] or data_files[condition]['consensus_feature_importance'] is None:
             continue
-        
         consensus_df = data_files[condition]['consensus_feature_importance']
         top_features = set(consensus_df.nlargest(top_n_features, 'mean_importance').index)
-        condition_importance[condition] = {
-            'df': consensus_df,
-            'top_features': top_features
-        }
+        condition_importance[condition] = {'df': consensus_df, 'top_features': top_features}
         all_top_features.update(top_features)
     
     if len(all_top_features) == 0:
         save_and_print("No feature importance data available for heatmap", print_report_file, level="info")
         return
     
-    # Step 2: Create importance matrix
-    feature_matrix = pd.DataFrame(index=list(all_top_features))
-    
+    # Step 2: Compute rankings
+    feature_rankings = pd.DataFrame(index=list(all_top_features))
     for condition, data in condition_importance.items():
-        importance_df = data['df']
+        df = data['df'].sort_values('mean_importance', ascending=False)
+        ranks = {f: r for r, (f, _) in enumerate(df.iterrows(), 1)}
+        max_rank = len(all_top_features) + 1
+        for f in all_top_features:
+            ranks.setdefault(f, max_rank)
+        feature_rankings[condition] = pd.Series(ranks)
+    
+    feature_rankings['avg_rank'] = feature_rankings.mean(axis=1)
+    feature_rankings = feature_rankings.sort_values('avg_rank', ascending=True)
+    sorted_features = feature_rankings.index.tolist()
+    
+    # Step 3: Build feature matrix
+    feature_matrix = pd.DataFrame(index=sorted_features)
+    for condition, data in condition_importance.items():
+        df = data['df']
+        max_val = df['mean_importance'].max()
+        norm = df['mean_importance'] / max_val if max_val > 0 else df['mean_importance']
+        feature_matrix[condition] = norm.reindex(sorted_features).fillna(0)
+    
+    shap_cols = [c for c in feature_matrix.columns if c.endswith("_shap")]
+    mdi_cols = [c for c in feature_matrix.columns if c.endswith("_mdi")]
+    shap_vmin, shap_vmax = 0, feature_matrix[shap_cols].max().max()
+    mdi_vmin, mdi_vmax = 0, feature_matrix[mdi_cols].max().max()
+    
+    # Step 4: Create figure with improved layout to prevent overlapping
+    fig, axes = plt.subplots(
+        2, 3,
+        figsize=(18, 14),  # Increased figure size for better spacing
+        dpi=300,
+        gridspec_kw={
+            'height_ratios': [1, 1],
+            'hspace': 0.15,   # More vertical space
+            'wspace': 0.10     # More horizontal space
+        }
+    )
+    
+    # Configure font sizes for better readability
+    title_fontsize = 16
+    label_fontsize = 13
+    tick_fontsize = 14
+    
+    for i, (method_key, method_label) in enumerate(methods.items()):
+        shap_cond = f"{model_name}_k{k_value}_{method_key}_split{split_size}_shap"
+        mdi_cond  = f"{model_name}_k{k_value}_{method_key}_split{split_size}_mdi"
         
-        # Normalize importance scores within each condition (0-1 scale)
-        max_importance = importance_df['mean_importance'].max()
-        if max_importance > 0:
-            normalized_scores = importance_df['mean_importance'] / max_importance
+        # SHAP subplot
+        ax_shap = axes[0, i]
+        if shap_cond in shap_cols:
+            sns.heatmap(
+                feature_matrix[[shap_cond]].iloc[:top_n_features],
+                ax=ax_shap, cmap="Reds", vmin=shap_vmin, vmax=shap_vmax,
+                cbar=False, 
+                yticklabels=True if i == 0 else False,
+                annot=False  # Remove annotations if they were causing overlap
+            )
+            # Rotate y-axis labels for better readability
+            if i == 0:
+                ax_shap.tick_params(axis='y', labelsize=tick_fontsize, rotation=0)
+                # Set y-tick labels with proper formatting
+                ylabels = [label.get_text() for label in ax_shap.get_yticklabels()]
+                ax_shap.set_yticklabels(ylabels, fontsize=tick_fontsize, rotation=0)
         else:
-            normalized_scores = importance_df['mean_importance']
+            ax_shap.text(0.5, 0.5, f"No SHAP data\n({method_label})", 
+                        ha='center', va='center', fontsize=11)
+            ax_shap.set_xticks([])
+            ax_shap.set_yticks([])
         
-        # Map normalized scores to features
-        feature_scores = {}
-        for feature in all_top_features:
-            if feature in importance_df.index:
-                feature_scores[feature] = normalized_scores[feature]
-            else:
-                feature_scores[feature] = 0  # Feature not selected in this condition
+        ax_shap.set_title(f"{method_label} (SHAP)", fontsize=title_fontsize, fontweight='bold', pad=10)
+        ax_shap.set_ylabel("Features (top ranked)" if i == 0 else "", fontsize=label_fontsize)
+        ax_shap.set_xticklabels([])  # Add this line
+        ax_shap.set_xlabel("")
         
-        feature_matrix[condition] = pd.Series(feature_scores)
-    
-    # Step 3: Create method-focused sub-heatmaps (Option C)
-    fig, axes = plt.subplots(2, 3, figsize=(18, 12), dpi=300)
-    fig.suptitle('Feature Importance Patterns by Method and Importance Type', fontsize=18, fontweight='bold')
-    
-    # Create sub-heatmaps for each method
-    for i, method_name in enumerate(methods.keys()):
-        # SHAP sub-heatmap
-        shap_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_shap"
-        mdi_condition = f"{model_name}_k{k_value}_{method_name}_split{split_size}_mdi"
+        if i > 0:
+            ax_shap.set_yticklabels([])
         
-        if shap_condition in feature_matrix.columns and mdi_condition in feature_matrix.columns:
-            # Get features for this method (union of SHAP and MDI top features)
-            method_features = set(condition_importance.get(shap_condition, {}).get('top_features', set())) | \
-                            set(condition_importance.get(mdi_condition, {}).get('top_features', set()))
-            
-            if len(method_features) > 0:
-                # Create submatrix for this method
-                method_matrix = feature_matrix.loc[list(method_features), [shap_condition, mdi_condition]]
-                
-                # Plot SHAP heatmap
-                sns.heatmap(method_matrix[[shap_condition]], ax=axes[0, i], cmap='Reds', 
-                           cbar_kws={'label': 'Normalized Importance'}, vmin=0, vmax=1)
-                axes[0, i].set_title(f'{methods[method_name]}\n(SHAP)', fontsize=14, fontweight='bold')
-                axes[0, i].set_ylabel('')
-                
-                # Plot MDI heatmap
-                sns.heatmap(method_matrix[[mdi_condition]], ax=axes[1, i], cmap='Blues', 
-                           cbar_kws={'label': 'Normalized Importance'}, vmin=0, vmax=1)
-                axes[1, i].set_title(f'{methods[method_name]}\n(MDI)', fontsize=14, fontweight='bold')
-                axes[1, i].set_ylabel('')
+        # MDI subplot
+        ax_mdi = axes[1, i]
+        if mdi_cond in mdi_cols:
+            sns.heatmap(
+                feature_matrix[[mdi_cond]].iloc[:top_n_features],
+                ax=ax_mdi, cmap="Blues", vmin=mdi_vmin, vmax=mdi_vmax,
+                cbar=False, 
+                yticklabels=True if i == 0 else False,
+                annot=False  # Remove annotations if they were causing overlap
+            )
+            # Rotate y-axis labels for better readability
+            if i == 0:
+                ax_mdi.tick_params(axis='y', labelsize=tick_fontsize, rotation=0)
+                # Set y-tick labels with proper formatting
+                ylabels = [label.get_text() for label in ax_mdi.get_yticklabels()]
+                ax_mdi.set_yticklabels(ylabels, fontsize=tick_fontsize, rotation=0)
+        else:
+            ax_mdi.text(0.5, 0.5, f"No MDI data\n({method_label})", 
+                       ha='center', va='center', fontsize=11)
+            ax_mdi.set_xticks([])
+            ax_mdi.set_yticks([])
+        
+        ax_mdi.set_title(f"{method_label} (MDI)", fontsize=title_fontsize, fontweight='bold', pad=10)
+        ax_mdi.set_ylabel("Features (top ranked)" if i == 0 else "", fontsize=label_fontsize)
+        ax_mdi.set_xticklabels([]) 
+        ax_mdi.set_xlabel("")
+        
+        if i > 0:
+            ax_mdi.set_yticklabels([])
     
-    plt.tight_layout()
+    # Step 5: Add shared colorbars with adjusted positions
+    cbar_ax_shap = fig.add_axes([0.93, 0.53, 0.015, 0.35])  # Adjusted position
+    cbar_ax_mdi = fig.add_axes([0.93, 0.10, 0.015, 0.35])   # Adjusted position
     
-    # Save the heatmap
+    sm_shap = plt.cm.ScalarMappable(cmap="Reds", norm=plt.Normalize(vmin=shap_vmin, vmax=shap_vmax))
+    sm_mdi = plt.cm.ScalarMappable(cmap="Blues", norm=plt.Normalize(vmin=mdi_vmin, vmax=mdi_vmax))
+    
+    # Fixed colorbar calls - removed fontsize parameter
+    cbar_shap = fig.colorbar(sm_shap, cax=cbar_ax_shap)
+    cbar_shap.set_label("Normalized Importance (SHAP)", fontsize=label_fontsize)
+    cbar_shap.ax.tick_params(labelsize=tick_fontsize)
+    
+    cbar_mdi = fig.colorbar(sm_mdi, cax=cbar_ax_mdi)
+    cbar_mdi.set_label("Normalized Importance (MDI)", fontsize=label_fontsize)
+    cbar_mdi.ax.tick_params(labelsize=tick_fontsize)
+    
+    # Adjust layout with padding
+    plt.tight_layout(rect=[0, 0, 0.92, 0.92], pad=3.0)  # Increased padding
+    
     if save_path:
-        heatmap_path = f"{save_path}feature_importance_comparative_heatmap_{exp_id}.png"
-        plt.savefig(heatmap_path, dpi=300, bbox_inches='tight')
-        save_and_print("✓ Created comparative feature importance heatmap", print_report_file, level="info")
+        heatmap_path = f"{save_path}feature_importance_comparative_heatmap_ranked_{exp_id}.png"
+        plt.savefig(heatmap_path, dpi=300, bbox_inches='tight', facecolor='white')
+        save_and_print("✓ Created enhanced comparative feature importance heatmap with shared colorbars", print_report_file, level="info")
     
     plt.show()
-    
-    return feature_matrix
+    return feature_matrix, feature_rankings
 
-# Create comparative heatmap
-feature_importance_matrix = create_comparative_feature_importance_heatmap(data_files, top_n_features=50, save_path=file_save_path)
+create_comparative_feature_importance_heatmap(
+    data_files, top_n_features=30, save_path=file_save_path
+)
 
 # %% [markdown]
 # ## Method-to-Method Feature Importance Comparison
@@ -1312,9 +1378,6 @@ export_comprehensive_results(performance_df, stability_results_all, convergence_
 
 # %%
 save_and_print("## Clinical Feature Subset Analysis", print_report_file, level="section")
-
-# Reopen the report file for additional content
-print_report_file = open(print_report_path, 'a', encoding='utf-8')
 
 # %%
 # Add missing imports for clinical feature analysis
