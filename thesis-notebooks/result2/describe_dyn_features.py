@@ -51,36 +51,20 @@ if not os.path.exists(f"{path_loader.get_data_path()}data/results/{folder_name}/
 
 file_save_path = f"{path_loader.get_data_path()}data/results/{folder_name}/{exp_id}/"
 
+
 # %%
-# Load Proteomics Palbociclib dataset
-loading_code = "goncalves-gdsc-2-Palbociclib-LN_IC50-sin"
-proteomic_feature_data, proteomic_label_data = data_link.get_data_using_code(
+# Load Transcriptomics Palbociclib dataset
+loading_code = "ccle-gdsc-2-Palbociclib-LN_IC50"
+rnaseq_feature_data, rnaseq_label_data = data_link.get_data_using_code(
     loading_code
 )
 
-print(f"Proteomic feature data shape: {proteomic_feature_data.shape}")
-print(f"Proteomic label data shape: {proteomic_label_data.shape}")
-
-# %%
-# Data preparation and alignment
-import numpy as np #noqa: E402
-
-# Ensure numeric only
-proteomic_feature_data = proteomic_feature_data.select_dtypes(include=[np.number])
-
-# Align indices
-common_indices = sorted(
-    set(proteomic_feature_data.index) & set(proteomic_label_data.index)
-)
-feature_data = proteomic_feature_data.loc[common_indices]
-label_data = proteomic_label_data.loc[common_indices]
-
-print(f"Final aligned dataset shape: {feature_data.shape}")
-print(f"Final aligned label shape: {label_data.shape}")
+print(f"RNASeq feature data shape: {rnaseq_feature_data.shape}")
+print(f"RNASeq label data shape: {rnaseq_label_data.shape}")
 
 # %%
 
-feature_data_dynamic, label_data_dynamic = data_link.get_data_using_code('generic-gdsc-1-FGFR_0939-LN_IC50-fgfr4_ccle_dynamic_features-true-Row')
+feature_data_dynamic, label_data_dynamic = data_link.get_data_using_code('generic-gdsc-2-Palbociclib-LN_IC50-cdk46_ccle_dynamic_features_v4_ccle-true-Unnamed: 0')
 print(f"Dynamic dataset shape: {feature_data_dynamic.shape}")
 print(f"Dynamic label shape: {label_data_dynamic.shape}")
 

@@ -39,3 +39,4 @@ ccle_protein_expression,0,data/proteomic-expression/ccle-2019-cell/ccle_proteomi
 ccle_protein_expression_info,0,data//proteomic-expression//ccle-2019-cell//ccle_proteomics_info.pkl
 cdk46_ccle_dynamic_features_v4_ccle,0,data//results//dynamic-features-CDK-AH-v4//ode_dynamic_features_time_norm.csv
 cdk46_ccle_dynamic_features_v4_ccle_proteomics,0,data//results//dynamic-features-CDK-AH-v4-proteomics//ode_dynamic_features_time_norm.csv
+fgfr4_dynamic_features_v3_proteomic,0,data//results//dynamic-features-FGFR4-SY-v3//dyn_features_proteomics.csv
