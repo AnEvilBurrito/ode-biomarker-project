@@ -1,22 +1,7 @@
-# ---
-# jupyter:
-#   jupytext:
-#     formats: ipynb,py:percent,md
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.17.3
-#   kernelspec:
-#     display_name: ode-biomarker-project
-#     language: python
-#     name: python3
-# ---
+## Initialisation
 
-# %% [markdown]
-# ## Initialisation
 
-# %%
+```python
 import os
 
 path = os.getcwd()
@@ -27,17 +12,25 @@ project_path = path[:index_project+7]
 # set the working directory
 os.chdir(project_path)
 print(f'Project path set to: {os.getcwd()}')
+```
+
+    Project path set to: c:\Github\ode-biomarker-project
+    
 
 
-# %%
+```python
 from PathLoader import PathLoader
 path_loader = PathLoader('data_config.env', 'current_user.env')
+```
 
-# %%
+
+```python
 from DataLink import DataLink
 data_link = DataLink(path_loader, 'data_codes.csv')
+```
 
-# %%
+
+```python
 folder_name = "ThesisResult3-BenchmarkingExpressionData"
 exp_id = "v1"
 
@@ -45,11 +38,12 @@ if not os.path.exists(f'{path_loader.get_data_path()}data/results/{folder_name}'
     os.makedirs(f'{path_loader.get_data_path()}data/results/{folder_name}')
 
 file_save_path = f'{path_loader.get_data_path()}data/results/{folder_name}/'
+```
 
-# %% [markdown]
-# ### Load in Palbociclib datasets
+### Load in Palbociclib datasets
 
-# %%
+
+```python
 # create a joint dataframe of cdk4 expression and drug response for palbociclib
 # load in original ccle data
 loading_code = "goncalves-gdsc-2-Palbociclib-LN_IC50-sin"
@@ -62,14 +56,18 @@ loading_code = "ccle-gdsc-2-Palbociclib-LN_IC50"
 ccle_feature_data, ccle_label_data = data_link.get_data_using_code(loading_code)
 
 print(f'CCLE feature data shape: {ccle_feature_data.shape}', f'CCLE label data shape: {ccle_label_data.shape}')
+```
 
-# %% [markdown]
-# ## Functions 
+    Proteomic feature data shape: (737, 6692) Proteomic label data shape: (737,)
+    CCLE feature data shape: (584, 19221) CCLE label data shape: (584,)
+    
 
-# %% [markdown]
-# ### Random Forest F-Regression
+## Functions 
 
-# %%
+### Random Forest F-Regression
+
+
+```python
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
@@ -147,12 +145,12 @@ def eval_regression(
         # Optional: include other artifacts if desired
         "y_pred": y_pred,
     }
+```
+
+### Expression Data Benchmarking Pipe
 
 
-# %% [markdown]
-# ### Expression Data Benchmarking Pipe
-
-# %%
+```python
 from typing import Dict, List, Literal
 import numpy as np # noqa: F811
 import pandas as pd
@@ -448,14 +446,14 @@ def baseline_eval(
     }
 
 
+```
 
-# %% [markdown]
-# ## Execution
+## Execution
 
-# %% [markdown]
-# ### Benchmarking Expression Datasets (k=500)
+### Benchmarking Expression Datasets (k=500)
 
-# %%
+
+```python
 import numpy as np  # noqa: F811
 import pandas as pd
 from toolkit import Powerkit  # noqa: F811
@@ -521,9 +519,19 @@ summary = (
     .reset_index()
 )
 print(summary)
+```
+
+        modality                  condition        mean         std  count
+    0  Proteomic  baseline_linearregression -129.901414  137.196029     50
+    1  Proteomic      baseline_randomforest    0.355548    0.088632     50
+    2  Proteomic               baseline_svr   -3.006362    1.287018     50
+    3     RNASeq  baseline_linearregression -167.403363  143.122033     50
+    4     RNASeq      baseline_randomforest    0.390518    0.085330     50
+    5     RNASeq               baseline_svr   -3.961613    1.544551     50
+    
 
 
-# %%
+```python
 from scipy.stats import pearsonr, spearmanr  # noqa: F811
 
 # Expand stored 'metrics' dict (if present) and show pearson/spearman by modality+condition,
@@ -578,20 +586,33 @@ df_all = pd.concat([df_all, recomputed], axis=1)
 # Optionally inspect row-level values
 display_cols = ["modality", "condition", "pearson_r_re", "spearman_rho_re", "r2_re"]
 # print("\nPer-row recomputed metrics:")
+```
+
+    Stored metrics (mean ± std) by modality and condition:
+                                        pearson_r         spearman_rho        
+                                             mean     std         mean     std
+    modality  condition                                                       
+    Proteomic baseline_linearregression    0.0301  0.1415       0.0263  0.1252
+              baseline_randomforest        0.6151  0.0725       0.5610  0.0846
+              baseline_svr                 0.2664  0.0984       0.2717  0.0899
+    RNASeq    baseline_linearregression    0.0303  0.1390       0.0375  0.1367
+              baseline_randomforest        0.6399  0.0693       0.5786  0.0889
+              baseline_svr                 0.2139  0.1242       0.1941  0.1218
+    
 
 
-# %%
+```python
 df_all.to_pickle(f"{file_save_path}benchmarking_results_{exp_id}.pkl")
 
 # Also save the individual modality results
 df_rna.to_pickle(f"{file_save_path}rna_results_{exp_id}.pkl")
 df_prot.to_pickle(f"{file_save_path}proteomic_results_{exp_id}.pkl")
+```
+
+### Benchmarking Expression Datasets (three k values)
 
 
-# %% [markdown]
-# ### Benchmarking Expression Datasets (three k values)
-
-# %%
+```python
 import numpy as np  # noqa: F811
 import pandas as pd
 from toolkit import Powerkit  # noqa: F811
@@ -642,22 +663,25 @@ add_baselines(pk_prot, models, k_values)
 
 # 3) Identical RNGs for fair repeated holdouts
 rngs = np.random.RandomState(42).randint(0, 100000, size=50)
+```
 
 
-# %%
+```python
 
 # 4) Run all conditions
 df_rna = pk_rna.run_all_conditions(rng_list=rngs, n_jobs=-1, verbose=True)
 df_rna["modality"] = "RNASeq"
+```
 
 
-# %%
+```python
 
 df_prot = pk_prot.run_all_conditions(rng_list=rngs, n_jobs=-1, verbose=True)
 df_prot["modality"] = "Proteomic"
+```
 
 
-# %%
+```python
 
 # 5) Concatenate and summarize
 df_all = pd.concat([df_rna, df_prot], ignore_index=True)
@@ -672,24 +696,66 @@ summary = (
     .reset_index()
 )
 print(summary)
+```
 
-# %%
+         modality                       condition  k_value        mean  \
+    0   Proteomic  baseline_linearregression_k100      100    0.237680   
+    1   Proteomic   baseline_linearregression_k20       20    0.251856   
+    2   Proteomic  baseline_linearregression_k500      500 -129.901414   
+    3   Proteomic      baseline_randomforest_k100      100    0.326178   
+    4   Proteomic       baseline_randomforest_k20       20    0.223699   
+    5   Proteomic      baseline_randomforest_k500      500    0.356187   
+    6   Proteomic               baseline_svr_k100      100    0.161652   
+    7   Proteomic                baseline_svr_k20       20    0.245159   
+    8   Proteomic               baseline_svr_k500      500   -3.006362   
+    9      RNASeq  baseline_linearregression_k100      100    0.263922   
+    10     RNASeq   baseline_linearregression_k20       20    0.345750   
+    11     RNASeq  baseline_linearregression_k500      500 -167.403363   
+    12     RNASeq      baseline_randomforest_k100      100    0.373112   
+    13     RNASeq       baseline_randomforest_k20       20    0.361074   
+    14     RNASeq      baseline_randomforest_k500      500    0.390327   
+    15     RNASeq               baseline_svr_k100      100    0.184066   
+    16     RNASeq                baseline_svr_k20       20    0.331694   
+    17     RNASeq               baseline_svr_k500      500   -3.961613   
+    
+               std  count  
+    0     0.149914     50  
+    1     0.097960     50  
+    2   137.196029     50  
+    3     0.092891     50  
+    4     0.096608     50  
+    5     0.089680     50  
+    6     0.171451     50  
+    7     0.100588     50  
+    8     1.287018     50  
+    9     0.135608     50  
+    10    0.114337     50  
+    11  143.122033     50  
+    12    0.097592     50  
+    13    0.114824     50  
+    14    0.086251     50  
+    15    0.141005     50  
+    16    0.115861     50  
+    17    1.544551     50  
+    
+
+
+```python
 df_all.to_pickle(f"{file_save_path}benchmarking_results_{exp_id}.pkl")
 
 # Also save the individual modality results
 df_rna.to_pickle(f"{file_save_path}rna_results_{exp_id}.pkl")
 df_prot.to_pickle(f"{file_save_path}proteomic_results_{exp_id}.pkl")
+```
+
+## Reading data 
+
+This section can be ran to read in the data used for the analysis. The initialisation code block must be run first to load in the correct file paths.
+
+### Data Extraction
 
 
-# %% [markdown]
-# ## Reading data 
-#
-# This section can be ran to read in the data used for the analysis. The initialisation code block must be run first to load in the correct file paths.
-
-# %% [markdown]
-# ### Data Extraction
-
-# %%
+```python
 import pandas as pd # noqa: F811
 
 # Load benchmark result pickles saved in Execution cells
@@ -716,8 +782,15 @@ for varname, filepath in files.items():
 df_all = _loaded.get("df_all")
 df_rna = _loaded.get("df_rna")
 df_prot = _loaded.get("df_prot")
+```
 
-# %%
+    Loaded df_all from I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/benchmarking_results_v1.pkl (shape: (900, 21))
+    Loaded df_rna from I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/rna_results_v1.pkl (shape: (450, 20))
+    Loaded df_prot from I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/proteomic_results_v1.pkl (shape: (450, 20))
+    
+
+
+```python
 # Filter dataframes to only include model_performance between 0 and 1
 if df_all is not None and "model_performance" in df_all.columns:
     df_all = df_all[
@@ -733,12 +806,168 @@ if df_prot is not None and "model_performance" in df_prot.columns:
     df_prot = df_prot[
         (df_prot["model_performance"] >= 0) & (df_prot["model_performance"] <= 1)
     ]
+```
 
 
-# %%
+```python
 df_all.describe()
+```
 
-# %%
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>rng</th>
+      <th>model_performance</th>
+      <th>k_requested</th>
+      <th>k_effective</th>
+      <th>n_features_initial</th>
+      <th>n_features_post_variance</th>
+      <th>n_features_post_correlation</th>
+      <th>var_threshold</th>
+      <th>corr_threshold</th>
+      <th>n_train_samples_used</th>
+      <th>k_value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>count</th>
+      <td>670.000000</td>
+      <td>670.000000</td>
+      <td>670.000000</td>
+      <td>670.000000</td>
+      <td>670.000000</td>
+      <td>670.000000</td>
+      <td>670.000000</td>
+      <td>670.0</td>
+      <td>670.00</td>
+      <td>670.0</td>
+      <td>670.000000</td>
+    </tr>
+    <tr>
+      <th>mean</th>
+      <td>50762.358209</td>
+      <td>0.305846</td>
+      <td>124.358209</td>
+      <td>124.358209</td>
+      <td>13050.000000</td>
+      <td>13028.676119</td>
+      <td>13028.676119</td>
+      <td>0.0</td>
+      <td>0.95</td>
+      <td>504.0</td>
+      <td>124.358209</td>
+    </tr>
+    <tr>
+      <th>std</th>
+      <td>29128.811782</td>
+      <td>0.114253</td>
+      <td>161.721281</td>
+      <td>161.721281</td>
+      <td>6268.481918</td>
+      <td>6275.079369</td>
+      <td>6275.079369</td>
+      <td>0.0</td>
+      <td>0.00</td>
+      <td>0.0</td>
+      <td>161.721281</td>
+    </tr>
+    <tr>
+      <th>min</th>
+      <td>769.000000</td>
+      <td>0.002004</td>
+      <td>20.000000</td>
+      <td>20.000000</td>
+      <td>6692.000000</td>
+      <td>6659.000000</td>
+      <td>6659.000000</td>
+      <td>0.0</td>
+      <td>0.95</td>
+      <td>504.0</td>
+      <td>20.000000</td>
+    </tr>
+    <tr>
+      <th>25%</th>
+      <td>25658.000000</td>
+      <td>0.226674</td>
+      <td>20.000000</td>
+      <td>20.000000</td>
+      <td>6692.000000</td>
+      <td>6664.000000</td>
+      <td>6664.000000</td>
+      <td>0.0</td>
+      <td>0.95</td>
+      <td>504.0</td>
+      <td>20.000000</td>
+    </tr>
+    <tr>
+      <th>50%</th>
+      <td>59150.000000</td>
+      <td>0.319054</td>
+      <td>100.000000</td>
+      <td>100.000000</td>
+      <td>19221.000000</td>
+      <td>19202.000000</td>
+      <td>19202.000000</td>
+      <td>0.0</td>
+      <td>0.95</td>
+      <td>504.0</td>
+      <td>100.000000</td>
+    </tr>
+    <tr>
+      <th>75%</th>
+      <td>73969.000000</td>
+      <td>0.386354</td>
+      <td>100.000000</td>
+      <td>100.000000</td>
+      <td>19221.000000</td>
+      <td>19206.000000</td>
+      <td>19206.000000</td>
+      <td>0.0</td>
+      <td>0.95</td>
+      <td>504.0</td>
+      <td>100.000000</td>
+    </tr>
+    <tr>
+      <th>max</th>
+      <td>96276.000000</td>
+      <td>0.549287</td>
+      <td>500.000000</td>
+      <td>500.000000</td>
+      <td>19221.000000</td>
+      <td>19209.000000</td>
+      <td>19209.000000</td>
+      <td>0.0</td>
+      <td>0.95</td>
+      <td>504.0</td>
+      <td>500.000000</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```python
 import numpy as np  # noqa: F811
 
 # Quick descriptive summary of df_all
@@ -783,14 +1012,173 @@ print(sel_len.describe())
 # Missingness overview (top 20)
 print("\nMissing values per column (top 20):")
 print(df_all.isna().sum().sort_values(ascending=False).head(20))
+```
 
-# %% [markdown]
-# ### Statistical tests
+    Shape: (670, 21)
+    
+    Columns and dtypes:
+    rng                              int64
+    condition                       object
+    feature_importance_from         object
+    model_performance              float64
+    metrics                         object
+    k_requested                      int64
+    k_effective                      int64
+    n_features_initial               int64
+    n_features_post_variance         int64
+    n_features_post_correlation      int64
+    var_threshold                  float64
+    corr_threshold                 float64
+    model_name                      object
+    model_params                    object
+    selected_features               object
+    selector_scores                 object
+    y_pred                          object
+    y_true_index                    object
+    n_train_samples_used             int64
+    modality                        object
+    k_value                          int64
+    dtype: object
+    
+    Memory usage (MB): 3.9952945709228516
+    
+    Info:
+    <class 'pandas.core.frame.DataFrame'>
+    Index: 670 entries, 0 to 897
+    Data columns (total 21 columns):
+     #   Column                       Non-Null Count  Dtype  
+    ---  ------                       --------------  -----  
+     0   rng                          670 non-null    int64  
+     1   condition                    670 non-null    object 
+     2   feature_importance_from      670 non-null    object 
+     3   model_performance            670 non-null    float64
+     4   metrics                      670 non-null    object 
+     5   k_requested                  670 non-null    int64  
+     6   k_effective                  670 non-null    int64  
+     7   n_features_initial           670 non-null    int64  
+     8   n_features_post_variance     670 non-null    int64  
+     9   n_features_post_correlation  670 non-null    int64  
+     10  var_threshold                670 non-null    float64
+     11  corr_threshold               670 non-null    float64
+     12  model_name                   670 non-null    object 
+     13  model_params                 670 non-null    object 
+     14  selected_features            670 non-null    object 
+     15  selector_scores              670 non-null    object 
+     16  y_pred                       670 non-null    object 
+     17  y_true_index                 670 non-null    object 
+     18  n_train_samples_used         670 non-null    int64  
+     19  modality                     670 non-null    object 
+     20  k_value                      670 non-null    int64  
+    dtypes: float64(3), int64(8), object(10)
+    memory usage: 115.2+ KB
+    
+    Numeric summary (describe):
+                                 count          mean           std          min  \
+    rng                          670.0  50762.358209  29128.811782   769.000000   
+    model_performance            670.0      0.305846      0.114253     0.002004   
+    k_requested                  670.0    124.358209    161.721281    20.000000   
+    k_effective                  670.0    124.358209    161.721281    20.000000   
+    n_features_initial           670.0  13050.000000   6268.481918  6692.000000   
+    n_features_post_variance     670.0  13028.676119   6275.079369  6659.000000   
+    n_features_post_correlation  670.0  13028.676119   6275.079369  6659.000000   
+    var_threshold                670.0      0.000000      0.000000     0.000000   
+    corr_threshold               670.0      0.950000      0.000000     0.950000   
+    n_train_samples_used         670.0    504.000000      0.000000   504.000000   
+    k_value                      670.0    124.358209    161.721281    20.000000   
+    
+                                          25%           50%           75%  \
+    rng                          25658.000000  59150.000000  73969.000000   
+    model_performance                0.226674      0.319054      0.386354   
+    k_requested                     20.000000    100.000000    100.000000   
+    k_effective                     20.000000    100.000000    100.000000   
+    n_features_initial            6692.000000  19221.000000  19221.000000   
+    n_features_post_variance      6664.000000  19202.000000  19206.000000   
+    n_features_post_correlation   6664.000000  19202.000000  19206.000000   
+    var_threshold                    0.000000      0.000000      0.000000   
+    corr_threshold                   0.950000      0.950000      0.950000   
+    n_train_samples_used           504.000000    504.000000    504.000000   
+    k_value                         20.000000    100.000000    100.000000   
+    
+                                          max  
+    rng                          96276.000000  
+    model_performance                0.549287  
+    k_requested                    500.000000  
+    k_effective                    500.000000  
+    n_features_initial           19221.000000  
+    n_features_post_variance     19209.000000  
+    n_features_post_correlation  19209.000000  
+    var_threshold                    0.000000  
+    corr_threshold                   0.950000  
+    n_train_samples_used           504.000000  
+    k_value                        500.000000  
+    
+    Modality counts:
+    modality
+    RNASeq       340
+    Proteomic    330
+    Name: count, dtype: int64
+    
+    Top conditions:
+    condition
+    baseline_randomforest_k100        100
+    baseline_randomforest_k500        100
+    baseline_linearregression_k20      99
+    baseline_svr_k20                   99
+    baseline_randomforest_k20          98
+    baseline_linearregression_k100     92
+    baseline_svr_k100                  82
+    Name: count, dtype: int64
+    
+    Sample rows:
+    modality                      condition            model_name  k_value   rng  model_performance
+      RNASeq  baseline_linearregression_k20      LinearRegression       20 15795           0.474755
+      RNASeq baseline_linearregression_k100      LinearRegression      100 15795           0.291513
+      RNASeq      baseline_randomforest_k20 RandomForestRegressor       20 15795           0.549287
+      RNASeq     baseline_randomforest_k100 RandomForestRegressor      100 15795           0.497893
+      RNASeq     baseline_randomforest_k500 RandomForestRegressor      500 15795           0.513963
+      RNASeq               baseline_svr_k20                   SVR       20 15795           0.464356
+    
+    selected_features length (count, mean, std, min, max):
+    count    670.000000
+    mean     124.358209
+    std      161.721281
+    min       20.000000
+    25%       20.000000
+    50%      100.000000
+    75%      100.000000
+    max      500.000000
+    Name: selected_features, dtype: float64
+    
+    Missing values per column (top 20):
+    rng                            0
+    condition                      0
+    feature_importance_from        0
+    model_performance              0
+    metrics                        0
+    k_requested                    0
+    k_effective                    0
+    n_features_initial             0
+    n_features_post_variance       0
+    n_features_post_correlation    0
+    var_threshold                  0
+    corr_threshold                 0
+    model_name                     0
+    model_params                   0
+    selected_features              0
+    selector_scores                0
+    y_pred                         0
+    y_true_index                   0
+    n_train_samples_used           0
+    modality                       0
+    dtype: int64
+    
 
-# %% [markdown]
-# #### Best vs worst for each dataset
+### Statistical tests
 
-# %%
+#### Best vs worst for each dataset
+
+
+```python
 # Group by modality, model, and k-value to find performance extremes
 performance_summary = (
     df_all.groupby(["modality", "model_name", "k_value"])["model_performance"]
@@ -812,9 +1200,21 @@ print(best_per_modality)
 
 print("\nWorst performing combinations by modality:")
 print(worst_per_modality)
+```
+
+    Best performing combinations by modality:
+         modality             model_name  k_value      mean       std  count
+    4   Proteomic  RandomForestRegressor      500  0.356187  0.089680     50
+    11     RNASeq  RandomForestRegressor      500  0.390327  0.086251     50
+    
+    Worst performing combinations by modality:
+         modality             model_name  k_value      mean       std  count
+    2   Proteomic  RandomForestRegressor       20  0.233494  0.085325     48
+    13     RNASeq                    SVR      100  0.222579  0.098398     44
+    
 
 
-# %%
+```python
 # Extract the actual performance data for best and worst combinations
 def extract_comparison_data(df, modality, model, k_value):
     """Extract all performance values for a specific combination"""
@@ -840,9 +1240,10 @@ rna_worst_data = extract_comparison_data(
 prot_worst_data = extract_comparison_data(
     df_all, "Proteomic", "LinearRegression", 500
 )  # Example: worst Proteomic [1]
+```
 
 
-# %%
+```python
 from scipy.stats import ttest_ind, mannwhitneyu
 
 # Compare best RNASeq vs best Proteomic
@@ -873,8 +1274,20 @@ prot_best_min = prot_best_data.min()
 
 print(f"RNASeq best max: {rna_best_max:.4f}, min: {rna_best_min:.4f}")
 print(f"Proteomic best max: {prot_best_max:.4f}, min: {prot_best_min:.4f}")
+```
 
-# %%
+    === STATISTICAL COMPARISON: BEST PERFORMERS ===
+    T-test: t-statistic = 1.9401, p-value = 0.0552
+    Mann-Whitney U: statistic = 1532.0000, p-value = 0.0523
+    Mean difference (RNASeq - Proteomic): 0.0341
+    RNASeq best mean: 0.3903
+    Proteomic best mean: 0.3562
+    RNASeq best max: 0.5388, min: 0.1433
+    Proteomic best max: 0.5064, min: 0.1196
+    
+
+
+```python
 print("\n=== STATISTICAL COMPARISON: WORST PERFORMERS ===")
 
 # T-test for worst performers
@@ -892,12 +1305,29 @@ print(f"Mann-Whitney U: statistic = {u_stat_worst:.4f}, p-value = {p_val_mw_wors
 # Effect size for worst performers
 mean_diff_worst = rna_worst_data.mean() - prot_worst_data.mean()
 print(f"Mean difference (RNASeq - Proteomic): {mean_diff_worst:.4f}")
+```
+
+    
+    === STATISTICAL COMPARISON: WORST PERFORMERS ===
+    T-test: t-statistic = nan, p-value = nan
+    Mann-Whitney U: statistic = nan, p-value = nan
+    Mean difference (RNASeq - Proteomic): nan
+    
+
+    c:\Github\ode-biomarker-project\.venv\lib\site-packages\scipy\_lib\deprecation.py:234: SmallSampleWarning: One or more sample arguments is too small; all returned values will be NaN. See documentation for sample size requirements.
+      return f(*args, **kwargs)
+    C:\Users\l8105\AppData\Local\Temp\ipykernel_14456\1699067676.py:10: SmallSampleWarning: One or more sample arguments is too small; all returned values will be NaN. See documentation for sample size requirements.
+      u_stat_worst, p_val_mw_worst = mannwhitneyu(
+    C:\Users\l8105\AppData\Local\Temp\ipykernel_14456\1699067676.py:16: RuntimeWarning: Mean of empty slice.
+      mean_diff_worst = rna_worst_data.mean() - prot_worst_data.mean()
+    c:\Github\ode-biomarker-project\.venv\lib\site-packages\numpy\_core\_methods.py:145: RuntimeWarning: invalid value encountered in scalar divide
+      ret = ret.dtype.type(ret / rcount)
+    
+
+### RNASeq Data
 
 
-# %% [markdown]
-# ### RNASeq Data
-
-# %%
+```python
 # Filter for RNASeq data only
 df_rna_only = df_all[df_all["modality"] == "RNASeq"]
 
@@ -910,9 +1340,21 @@ model_performance_rna = (
 
 print("RNASeq Performance by Model Type:")
 print(model_performance_rna.round(4))
+```
+
+    RNASeq Performance by Model Type:
+                  model_name  k_value    mean     std  count
+    0       LinearRegression       20  0.3458  0.1143     50
+    1       LinearRegression      100  0.2941  0.0911     46
+    2  RandomForestRegressor       20  0.3611  0.1148     50
+    3  RandomForestRegressor      100  0.3731  0.0976     50
+    4  RandomForestRegressor      500  0.3903  0.0863     50
+    5                    SVR       20  0.3317  0.1159     50
+    6                    SVR      100  0.2226  0.0984     44
+    
 
 
-# %%
+```python
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
@@ -940,9 +1382,19 @@ print(f"Saved figure to: {fname}")
 plt.show()
 # Close the figure to free memory
 plt.close()
+```
+
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/boxplot_overall_performance_v1.png
+    
 
 
-# %%
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_37_1.png)
+    
+
+
+
+```python
 from scipy.stats import f_oneway, kruskal
 
 # Extract performance data for each model
@@ -962,9 +1414,14 @@ h_stat, p_val_kw = kruskal(*[model_data[model] for model in models])
 print(
     f"Kruskal-Wallis across models: H-statistic = {h_stat:.4f}, p-value = {p_val_kw:.4f}"
 )
+```
+
+    ANOVA across models: F-statistic = 22.9054, p-value = 0.0000
+    Kruskal-Wallis across models: H-statistic = 44.0315, p-value = 0.0000
+    
 
 
-# %%
+```python
 # Comprehensive RNASeq analysis
 rna_analysis = (
     df_rna_only.groupby(["model_name", "k_value"])["model_performance"]
@@ -988,9 +1445,34 @@ print(rna_analysis)
 best_rna_model = rna_analysis["mean_r2"].idxmax()
 best_rna_performance = rna_analysis["mean_r2"].max()
 print(f"\nBest RNASeq model: {best_rna_model} with R² = {best_rna_performance:.4f}")
+```
+
+    Detailed RNASeq Performance Analysis:
+                                   mean_r2  std_r2  median_r2  min_r2  max_r2  \
+    model_name            k_value                                               
+    LinearRegression      20        0.3458  0.1143     0.3673  0.0078  0.5241   
+                          100       0.2941  0.0911     0.2907  0.0118  0.4848   
+    RandomForestRegressor 20        0.3611  0.1148     0.3868  0.0020  0.5493   
+                          100       0.3731  0.0976     0.3800  0.0540  0.5228   
+                          500       0.3903  0.0863     0.3968  0.1433  0.5388   
+    SVR                   20        0.3317  0.1159     0.3504  0.0425  0.5332   
+                          100       0.2226  0.0984     0.2380  0.0041  0.4239   
+    
+                                   count  
+    model_name            k_value         
+    LinearRegression      20          50  
+                          100         46  
+    RandomForestRegressor 20          50  
+                          100         50  
+                          500         50  
+    SVR                   20          50  
+                          100         44  
+    
+    Best RNASeq model: ('RandomForestRegressor', np.int64(500)) with R² = 0.3903
+    
 
 
-# %%
+```python
 # Compare how each model performs with different feature selection sizes
 k_value_comparison = df_rna_only.pivot_table(
     index="model_name", columns="k_value", values="model_performance", aggfunc="mean"
@@ -998,15 +1480,22 @@ k_value_comparison = df_rna_only.pivot_table(
 
 print("RNASeq Model Performance by k-value:")
 print(k_value_comparison)
+```
+
+    RNASeq Model Performance by k-value:
+    k_value                   20      100     500
+    model_name                                   
+    LinearRegression       0.3458  0.2941     NaN
+    RandomForestRegressor  0.3611  0.3731  0.3903
+    SVR                    0.3317  0.2226     NaN
+    
+
+### Heatmaps
+
+#### General heatmap
 
 
-# %% [markdown]
-# ### Heatmaps
-
-# %% [markdown]
-# #### General heatmap
-
-# %%
+```python
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -1071,8 +1560,19 @@ plt.show()
 
 # Optional: Close the figure to free memory
 plt.close()
+```
 
-# %%
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/heatmap_performance_comparison.png
+    
+
+
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_43_1.png)
+    
+
+
+
+```python
 # Save the heatmap figure created from `heatmap_data` to the results folder
 os.makedirs(file_save_path, exist_ok=True)
 fname = os.path.join(file_save_path, f"heatmap_performance_by_model_k_{exp_id}.png")
@@ -1103,15 +1603,17 @@ plt.savefig(fname, dpi=300, bbox_inches="tight")
 plt.close()
 
 print(f"Saved heatmap to: {fname}")
+```
+
+    Saved heatmap to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/heatmap_performance_by_model_k_v1.png
+    
+
+### Box Plots
+
+#### Overall comparison
 
 
-# %% [markdown]
-# ### Box Plots
-
-# %% [markdown]
-# #### Overall comparison
-
-# %%
+```python
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -1208,12 +1710,21 @@ plt.show()
 
 # Optional: Close the figure to free memory
 plt.close()
+```
+
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/modality_comparison_boxenplot_v1.png
+    
 
 
-# %% [markdown]
-# #### Compare by model type
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_47_1.png)
+    
 
-# %%
+
+#### Compare by model type
+
+
+```python
 # Compare modalities within each model type with publication-quality styling
 plt.figure(figsize=(10, 6))  # Adjusted figure size for horizontal orientation
 
@@ -1285,12 +1796,21 @@ plt.show()
 
 # Optional: Close the figure to free memory
 plt.close()
+```
+
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/model_modality_comparison_v1.png
+    
 
 
-# %% [markdown]
-# #### Compare by k value
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_49_1.png)
+    
 
-# %%
+
+#### Compare by k value
+
+
+```python
 # Compare performance across k-values for each modality
 plt.figure(figsize=(10, 6))
 sns.boxenplot(
@@ -1331,12 +1851,21 @@ print(f"Saved figure to: {fname}")
 plt.show()
 # Optional: Close the figure to free memory
 plt.close()
+```
+
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/kvalue_modality_comparison_v1.png
+    
 
 
-# %% [markdown]
-# #### Facet Grid
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_51_1.png)
+    
 
-# %%
+
+#### Facet Grid
+
+
+```python
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -1402,12 +1931,21 @@ fname = os.path.join(file_save_path, f"model_modality_stats_{exp_id}.png")
 plt.savefig(fname, dpi=300, bbox_inches="tight")
 print(f"Saved figure to: {fname}")
 plt.show()
+```
+
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/model_modality_stats_v1.png
+    
 
 
-# %% [markdown]
-# #### Best performer
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_53_1.png)
+    
 
-# %%
+
+#### Best performer
+
+
+```python
 # Group by modality, model, and k-value to find best performers
 performance_comparison = (
     df_all.groupby(["modality", "model_name", "k_value"])["model_performance"]
@@ -1422,9 +1960,20 @@ best_per_modality_k = performance_comparison.loc[
 
 print("Best performing models by modality and k-value:")
 print(best_per_modality_k.sort_values(["modality", "k_value"]))
+```
+
+    Best performing models by modality and k-value:
+         modality             model_name  k_value      mean       std  count
+    0   Proteomic       LinearRegression       20  0.258751  0.085843     49
+    3   Proteomic  RandomForestRegressor      100  0.326178  0.092891     50
+    4   Proteomic  RandomForestRegressor      500  0.356187  0.089680     50
+    9      RNASeq  RandomForestRegressor       20  0.361074  0.114824     50
+    10     RNASeq  RandomForestRegressor      100  0.373112  0.097592     50
+    11     RNASeq  RandomForestRegressor      500  0.390327  0.086251     50
+    
 
 
-# %%
+```python
 # Create a pivot table for easy comparison
 pivot_comparison = df_all.pivot_table(
     index=["model_name", "k_value"],
@@ -1435,9 +1984,23 @@ pivot_comparison = df_all.pivot_table(
 
 print("RNASeq vs Proteomic Performance Comparison:")
 print(pivot_comparison)
+```
+
+    RNASeq vs Proteomic Performance Comparison:
+                                       mean               std        
+    modality                      Proteomic  RNASeq Proteomic  RNASeq
+    model_name            k_value                                    
+    LinearRegression      20         0.2588  0.3458    0.0858  0.1143
+                          100        0.2638  0.2941    0.1254  0.0911
+    RandomForestRegressor 20         0.2335  0.3611    0.0853  0.1148
+                          100        0.3262  0.3731    0.0929  0.0976
+                          500        0.3562  0.3903    0.0897  0.0863
+    SVR                   20         0.2517  0.3317    0.0902  0.1159
+                          100        0.2375  0.2226    0.1147  0.0984
+    
 
 
-# %%
+```python
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -1452,9 +2015,16 @@ plt.ylabel("Mean R² Score")
 plt.xlabel("k-value (Number of Features)")
 plt.legend(title="Data Modality", fontsize=12)
 plt.show()
+```
 
 
-# %%
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_57_0.png)
+    
+
+
+
+```python
 # Compare the best RNASeq vs best Proteomic for each k-value
 for k_val in [20, 100, 500]:
     rna_best = df_all[(df_all["modality"] == "RNASeq") & (df_all["k_value"] == k_val)]
@@ -1469,15 +2039,19 @@ for k_val in [20, 100, 500]:
     print(
         f"k={k_val}: RNASeq best: {rna_mean:.4f}, Proteomic best: {prot_mean:.4f}, Difference: {rna_mean - prot_mean:.4f}"
     )
+```
+
+    k=20: RNASeq best: 0.3611, Proteomic best: 0.2588, Difference: 0.1023
+    k=100: RNASeq best: 0.3731, Proteomic best: 0.3262, Difference: 0.0469
+    k=500: RNASeq best: 0.3903, Proteomic best: 0.3562, Difference: 0.0341
+    
+
+### Metrics comparison
+
+#### Extract metrics
 
 
-# %% [markdown]
-# ### Metrics comparison
-
-# %% [markdown]
-# #### Extract metrics
-
-# %%
+```python
 # 1) First extract metrics from the dictionary column
 if "metrics" in df_all.columns:
     # Unpack the metrics dictionary into separate columns
@@ -1502,12 +2076,30 @@ if "metrics" in df_all.columns:
         print(df_all_extended[["r2", "pearson_r", "spearman_rho"]].describe().round(4))
 else:
     print("The 'metrics' column was not found in df_all")
+```
+
+    Correlation matrix between evaluation metrics:
+                      r2  pearson_r  spearman_rho
+    r2            1.0000     0.9434        0.7633
+    pearson_r     0.9434     1.0000        0.8161
+    spearman_rho  0.7633     0.8161        1.0000
+    
+    Metric summary statistics:
+                 r2  pearson_r  spearman_rho
+    count  502.0000   502.0000      502.0000
+    mean     0.3051     0.5788        0.5126
+    std      0.1134     0.0851        0.1042
+    min      0.0020     0.3101        0.1432
+    25%      0.2257     0.5269        0.4475
+    50%      0.3186     0.5877        0.5188
+    75%      0.3860     0.6416        0.5881
+    max      0.5462     0.7571        0.7293
+    
+
+#### Rank consistency
 
 
-# %% [markdown]
-# #### Rank consistency
-
-# %%
+```python
 def compare_metric_rankings(df, group_cols=["modality", "condition"]):
     # First extract metrics if needed
     if "metrics" in df.columns and "r2" not in df.columns:
@@ -1546,9 +2138,17 @@ if (
         print("Not enough metrics available for rank comparison")
 else:
     print("No metric columns found in df_all")
+```
+
+    Rank correlation between metrics:
+                      r2  pearson_r  spearman_rho
+    r2            1.0000     0.9604        0.9429
+    pearson_r     0.9604     1.0000        0.9165
+    spearman_rho  0.9429     0.9165        1.0000
+    
 
 
-# %%
+```python
 import os
 
 # Heatmap for rank correlation between metrics
@@ -1583,8 +2183,19 @@ print(f"Saved heatmap to: {out_fname}")
 
 plt.show()
 plt.close()
+```
 
-# %%
+    Saved heatmap to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/rank_correlation_heatmap_v1.png
+    
+
+
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_64_1.png)
+    
+
+
+
+```python
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -1615,9 +2226,19 @@ if "metrics" in df_all.columns:
         plt.close()
 else:
     print("Cannot create scatter plots: 'metrics' column not found")
+```
+
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/metrics_pairplot_v1.png
+    
 
 
-# %%
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_65_1.png)
+    
+
+
+
+```python
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -1650,12 +2271,21 @@ if "metrics" in df_all.columns:
         plt.close()
 else:
     print("Cannot create scatter plots: 'metrics' column not found")
+```
+
+    Saved figure to: I:\My Drive\DAWSON PHD PROJECT\Biomarker Data Repository\data/results/ThesisResult3-BenchmarkingExpressionData/metrics_pairplot_v1.png
+    
 
 
-# %% [markdown]
-# #### Condition-level agreement
+    
+![png](benchmarking_expression_data_files/benchmarking_expression_data_66_1.png)
+    
 
-# %%
+
+#### Condition-level agreement
+
+
+```python
 # Compare metric values across different experimental conditions
 if "metrics" in df_all.columns:
     metrics_df = pd.json_normalize(df_all["metrics"])
@@ -1691,12 +2321,35 @@ if "metrics" in df_all.columns:
         print(f"R² vs Spearman rho: {condition_metrics['r2_spearman_diff'].mean():.4f}")
 else:
     print("Cannot perform condition-level analysis: 'metrics' column not found")
+```
+
+    Metric comparison by condition:
+                                                  r2  pearson_r  spearman_rho
+    modality  condition                                                      
+    Proteomic baseline_linearregression_k100  0.2596     0.5436        0.4563
+              baseline_linearregression_k20   0.2535     0.5417        0.4626
+              baseline_randomforest_k100      0.2654     0.5410        0.4687
+              baseline_randomforest_k20       0.2755     0.5491        0.4580
+              baseline_randomforest_k500      0.2980     0.5699        0.4899
+              baseline_svr_k100               0.2867     0.5611        0.4762
+              baseline_svr_k20                0.2890     0.5650        0.4942
+    RNASeq    baseline_linearregression_k100  0.3250     0.5924        0.5423
+              baseline_linearregression_k20   0.3205     0.5936        0.5446
+              baseline_randomforest_k100      0.3246     0.5944        0.5387
+              baseline_randomforest_k20       0.3202     0.5912        0.5276
+              baseline_randomforest_k500      0.3065     0.5850        0.5193
+              baseline_svr_k100               0.3171     0.5876        0.5170
+              baseline_svr_k20                0.3221     0.5943        0.5324
+    
+    Average absolute differences between metrics:
+    R² vs Pearson r: 0.2747
+    R² vs Spearman rho: 0.2046
+    
+
+#### Statistical significance
 
 
-# %% [markdown]
-# #### Statistical significance
-
-# %%
+```python
 from scipy.stats import ttest_rel
 
 if "metrics" in df_all.columns:
@@ -1722,3 +2375,8 @@ if "metrics" in df_all.columns:
         )
 else:
     print("Cannot perform statistical tests: 'metrics' column not found")
+```
+
+    R² vs Pearson r t-test: statistic=-161.3835, p-value=0.0000
+    R² vs Spearman rho t-test: statistic=-71.4880, p-value=0.0000
+    
