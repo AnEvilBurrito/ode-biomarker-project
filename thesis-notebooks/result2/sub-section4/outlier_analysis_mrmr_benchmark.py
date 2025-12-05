@@ -133,6 +133,10 @@ if 'condition' in df_benchmark.columns and 'model_name' in df_benchmark.columns:
     df_benchmark['model_name'] = df_benchmark['condition'].apply(parse_model_name_from_condition)
     df_outliers['model_name'] = df_outliers['condition'].apply(parse_model_name_from_condition)
 
+# %%
+df_benchmark['rng'].unique()
+
+
 # %% [markdown]
 # ## Model-Specific Outlier Analysis
 

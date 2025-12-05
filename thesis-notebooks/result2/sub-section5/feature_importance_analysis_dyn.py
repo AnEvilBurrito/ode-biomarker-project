@@ -155,6 +155,20 @@ for pattern in file_patterns:
 save_and_print(f"📊 Total datasets loaded: {len(datasets)}", print_report_file, level="info")
 save_and_print(f"Available datasets: {list(datasets.keys())}", print_report_file, level="info")
 
+# Print RNG seeds used in the experiment
+save_and_print("### RNG Seeds Used in Feature Importance Analysis", print_report_file, level="subsection")
+
+if 'feature_importance_analysis' in datasets:
+    dataset = datasets['feature_importance_analysis']
+    if isinstance(dataset, pd.DataFrame) and 'rng' in dataset.columns:
+        rng_seeds = sorted(dataset['rng'].unique())
+        save_and_print(f"RNG seeds found: {len(rng_seeds)} unique seeds", print_report_file, level="info")
+        save_and_print(f"RNG seed values: {rng_seeds}", print_report_file, level="info")
+    else:
+        save_and_print("RNG column not found in feature_importance_analysis dataset", print_report_file, level="info")
+else:
+    save_and_print("feature_importance_analysis dataset not found", print_report_file, level="info")
+
 # %% [markdown]
 # ## Section 1: Basic Data Statistics
 
@@ -405,7 +419,7 @@ if 'shap_consensus_importance_signed' in datasets:
                     # Set up publication-quality styling
                     plt.style.use('seaborn-v0_8')
                     plt.rcParams['font.family'] = 'sans-serif'
-                    plt.rcParams['font.size'] = 12
+                    plt.rcParams['font.size'] = 14
                     plt.rcParams['axes.linewidth'] = 1.2
                     
                     # Take top 20 features by absolute signed importance (both positive and negative)
@@ -432,15 +446,15 @@ if 'shap_consensus_importance_signed' in datasets:
                     y_positions = range(len(top_features))
                     feature_names = [str(feature) for feature in top_features.index.get_level_values(1)]
                     ax.set_yticks(y_positions)
-                    ax.set_yticklabels(feature_names, fontsize=10)
+                    ax.set_yticklabels(feature_names, fontsize=12)
                     
                     # Label axes
-                    ax.set_xlabel('Mean Signed SHAP Value', fontsize=12, fontweight='bold')
-                    ax.set_ylabel('Feature', fontsize=12, fontweight='bold')
+                    ax.set_xlabel('Mean Signed SHAP Value', fontsize=14, fontweight='bold')
+                    ax.set_ylabel('Feature', fontsize=14, fontweight='bold')
                     # Generate natural title from condition
                     natural_title = parse_condition_title(condition)
                     ax.set_title(f'SHAP Directional Feature Effects\n{natural_title}\n(Top 20 Features by Absolute Importance)', 
-                                fontsize=14, fontweight='bold', pad=20)
+                                fontsize=16, fontweight='bold', pad=20)
                     
                     # Set x-axis limits to accommodate both positive and negative values
                     x_min = top_features['mean_importance_signed'].min() * 1.1
@@ -454,11 +468,11 @@ if 'shap_consensus_importance_signed' in datasets:
                     for i, (v, feature_name) in enumerate(zip(top_features['mean_importance_signed'], feature_names)):
                         if v < 0:
                             # For negative values, place label to the right of the bar
-                            ax.text(v + (x_max - x_min) * 0.01, i, f'{v:.4f}', va='center', fontsize=9, 
+                            ax.text(v + (x_max - x_min) * 0.01, i, f'{v:.4f}', va='center', fontsize=11, 
                                     fontweight='bold', color='white' if abs(v) > 0.01 else 'black')
                         else:
                             # For positive values, place label to the left of the bar
-                            ax.text(v - (x_max - x_min) * 0.01, i, f'{v:.4f}', va='center', fontsize=9, 
+                            ax.text(v - (x_max - x_min) * 0.01, i, f'{v:.4f}', va='center', fontsize=11, 
                                     fontweight='bold', color='white' if abs(v) > 0.01 else 'black', ha='right')
                     
                     # Create custom legend
@@ -467,7 +481,7 @@ if 'shap_consensus_importance_signed' in datasets:
                         Patch(facecolor='blue', alpha=0.7, label='Positive Effect (Promote Resistance)'),
                         Patch(facecolor='red', alpha=0.7, label='Negative Effect (Promote Sensitivity)')
                     ]
-                    ax.legend(handles=legend_elements, loc='lower right', fontsize=10, framealpha=0.9)
+                    ax.legend(handles=legend_elements, loc='lower right', fontsize=12, framealpha=0.9)
                     
                     # Add grid for readability
                     ax.grid(axis='x', alpha=0.2, linestyle='--')
@@ -614,13 +628,13 @@ def create_positive_matrix_plot(signed_consensus_data, file_save_path, exp_id):
     # Set up publication-quality styling
     plt.style.use('seaborn-v0_8')
     plt.rcParams['font.family'] = 'sans-serif'
-    plt.rcParams['font.size'] = 11
+    plt.rcParams['font.size'] = 14
     plt.rcParams['axes.linewidth'] = 1.2
     
     # Create 2×3 subplot grid
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10), dpi=300)
-    fig.suptitle('Positive Impact Feature Comparison Across Datasets\n(Top 5 Features per Condition)', 
-                 fontsize=16, fontweight='bold', y=0.95)
+    fig, axes = plt.subplots(2, 3, figsize=(12, 8), dpi=300)
+    # fig.suptitle('Positive Impact Feature Comparison Across Datasets\n(Top 5 Features per Condition)', 
+    #              fontsize=16, fontweight='bold', y=0.95)
     
     # Color scheme
     positive_color = '#1f77b4'  # Royal Blue
@@ -680,15 +694,15 @@ def create_positive_matrix_plot(signed_consensus_data, file_save_path, exp_id):
         
         # Set y-axis labels
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(feature_names, fontsize=9)
-        
+        ax.set_yticklabels(feature_names, fontsize=12)
+        ax.invert_yaxis()
         # Set consistent x-axis limits
         ax.set_xlim(global_x_min, global_x_max * 1.1)
         
         # Add value labels
         for idx, (y, value) in enumerate(zip(y_pos, values)):
             ax.text(value + (global_x_max - global_x_min) * 0.005, y, 
-                   f'{value:.4f}', va='center', fontsize=8, fontweight='bold')
+                   f'{value:.4f}', va='center', fontsize=11, fontweight='bold')
         
         # Add grid and zero line
         ax.grid(axis='x', alpha=0.2, linestyle='--')
@@ -697,15 +711,15 @@ def create_positive_matrix_plot(signed_consensus_data, file_save_path, exp_id):
         # Set subplot title
         network_name = 'CDK4/6' if plot_info['network'] == 'cdk46' else 'FGFR4'
         dataset_name = plot_info['dataset_type'].title()
-        ax.set_title(f'{network_name} - {dataset_name}', fontsize=12, fontweight='bold')
+        ax.set_title(f'{network_name} - {dataset_name}', fontsize=14, fontweight='bold')
         
         # Set x-axis label for bottom row
-        if i == 1:
-            ax.set_xlabel('Mean Signed SHAP Value', fontsize=10)
+        # if i == 1:
+        #     ax.set_xlabel('Mean Signed SHAP Value', fontsize=12)
         
-        # Set y-axis label for first column
-        if j == 0:
-            ax.set_ylabel('Feature', fontsize=10)
+        # # Set y-axis label for first column
+        # if j == 0:
+        #     ax.set_ylabel('Feature', fontsize=12)
     
     # Hide empty subplots
     for i in range(2):
@@ -741,7 +755,6 @@ else:
 
 # %%
 save_and_print("## PLOT 2: Negative Effect Comparative Matrix Plot (2×3 Grid)", print_report_file, level="section")
-
 def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
     """
     Create a 2×3 matrix plot showing top 5 negative-impact features across all experimental conditions.
@@ -767,13 +780,13 @@ def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
     # Set up publication-quality styling
     plt.style.use('seaborn-v0_8')
     plt.rcParams['font.family'] = 'sans-serif'
-    plt.rcParams['font.size'] = 11
+    plt.rcParams['font.size'] = 14
     plt.rcParams['axes.linewidth'] = 1.2
     
     # Create 2×3 subplot grid
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10), dpi=300)
-    fig.suptitle('Negative Impact Feature Comparison Across Datasets\n(Top 5 Features per Condition)', 
-                 fontsize=16, fontweight='bold', y=0.95)
+    fig, axes = plt.subplots(2, 3, figsize=(12, 8), dpi=300)
+    # fig.suptitle('Negative Impact Feature Comparison Across Datasets\n(Top 5 Features per Condition)', 
+    #              fontsize=16, fontweight='bold', y=0.95)
     
     # Color scheme
     negative_color = '#dc143c'  # Crimson Red
@@ -802,7 +815,7 @@ def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
                 top_5_negative = negative_effects.nsmallest(5, 'mean_importance_signed')
                 
                 if len(top_5_negative) > 0:
-                    # Sort for visualization (most negative first)
+                    # Sort for visualization (most negative first - descending order)
                     top_5_negative = top_5_negative.sort_values('mean_importance_signed', ascending=True)
                     
                     # Update global limits (negative values)
@@ -823,6 +836,7 @@ def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
         data = plot_info['data']
         
         # Create horizontal bars for negative effects
+        # Use reversed y_pos to put most negative on top
         y_pos = range(len(data))
         values = data['mean_importance_signed'].values
         feature_names = [str(feat) for feat in data.index.get_level_values(1)]
@@ -831,9 +845,12 @@ def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
         bars = ax.barh(y_pos, values, color=negative_color, alpha=0.8, 
                       edgecolor='black', linewidth=0.5)
         
-        # Set y-axis labels
+        # Set y-axis labels - use original order but show from top to bottom
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(feature_names, fontsize=9)
+        ax.set_yticklabels(feature_names, fontsize=12)
+        
+        # ✅ FIX: Invert y-axis to show most negative features on top
+        ax.invert_yaxis()
         
         # Set consistent x-axis limits
         ax.set_xlim(global_x_min, global_x_max)
@@ -841,7 +858,7 @@ def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
         # Add value labels (to the right of negative bars)
         for idx, (y, value) in enumerate(zip(y_pos, values)):
             ax.text(value + (global_x_max - global_x_min) * 0.005, y, 
-                   f'{value:.4f}', va='center', fontsize=8, fontweight='bold')
+                   f'{value:.4f}', va='center', fontsize=11, fontweight='bold')
         
         # Add grid and zero line
         ax.grid(axis='x', alpha=0.2, linestyle='--')
@@ -850,15 +867,15 @@ def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
         # Set subplot title
         network_name = 'CDK4/6' if plot_info['network'] == 'cdk46' else 'FGFR4'
         dataset_name = plot_info['dataset_type'].title()
-        ax.set_title(f'{network_name} - {dataset_name}', fontsize=12, fontweight='bold')
+        ax.set_title(f'{network_name} - {dataset_name}', fontsize=14, fontweight='bold')
         
         # Set x-axis label for bottom row
-        if i == 1:
-            ax.set_xlabel('Mean Signed SHAP Value', fontsize=10)
+        # if i == 1:
+        #     ax.set_xlabel('Mean Signed SHAP Value', fontsize=12)
         
-        # Set y-axis label for first column
-        if j == 0:
-            ax.set_ylabel('Feature', fontsize=10)
+        # # Set y-axis label for first column
+        # if j == 0:
+        #     ax.set_ylabel('Feature', fontsize=12)
     
     # Hide empty subplots
     for i in range(2):
@@ -888,326 +905,6 @@ if 'shap_consensus_importance_signed' in datasets:
         save_and_print(f"❌ Error creating negative matrix plot: {str(e)}", print_report_file, level="info")
 else:
     save_and_print("No data available for negative matrix plot", print_report_file, level="info")
-
-# %% [markdown]
-# ## Section 7: Major Plot 3 - CDK4/6 Network Paired Comparison
-
-# %%
-save_and_print("## PLOT 3: CDK4/6 Network - Feature Importance Comparison (Isolation vs Combined)", print_report_file, level="section")
-
-def create_cdk46_paired_comparison(signed_consensus_data, file_save_path, exp_id):
-    """
-    Create paired comparison plots for CDK4/6 network showing dynamic and RNA-seq features
-    in isolation vs combined contexts.
-    """
-    save_and_print("### Creating CDK4/6 Network Paired Comparison", print_report_file, level="subsection")
-    
-    if not isinstance(signed_consensus_data, pd.DataFrame):
-        save_and_print("Invalid data format for paired comparison", print_report_file, level="info")
-        return
-    
-    # Extract conditions for CDK4/6 network
-    cdk46_conditions = [cond for cond in signed_consensus_data.index.get_level_values(0).unique() 
-                       if 'cdk46' in cond]
-    
-    # Separate conditions by dataset type
-    dynamic_condition = next((cond for cond in cdk46_conditions if 'dynamic' in cond), None)
-    rnaseq_condition = next((cond for cond in cdk46_conditions if 'rnaseq' in cond), None)
-    combined_condition = next((cond for cond in cdk46_conditions if 'combined' in cond), None)
-    
-    if not all([dynamic_condition, rnaseq_condition, combined_condition]):
-        save_and_print("Missing required conditions for CDK4/6 comparison", print_report_file, level="info")
-        return
-    
-    # Set up publication-quality styling
-    plt.style.use('seaborn-v0_8')
-    plt.rcParams['font.family'] = 'sans-serif'
-    plt.rcParams['font.size'] = 11
-    
-    # Create figure with 1 row, 2 columns
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=300)
-    fig.suptitle('CDK4/6 Network: Feature Importance Comparison\nIsolated vs Combined Dataset Contexts', 
-                 fontsize=16, fontweight='bold', y=0.95)
-    
-    # Color schemes
-    positive_color = '#1f77b4'  # Blue for positive
-    negative_color = '#dc143c'  # Red for negative
-    
-    # Panel 1: Dynamic Features Comparison
-    ax1.set_title('Dynamic Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
-    
-    # Get top dynamic features from dynamic-only condition
-    dynamic_data = signed_consensus_data.xs(dynamic_condition, level=0, drop_level=False)
-    top_dynamic_features = dynamic_data.nlargest(10, 'mean_importance_signed').index.get_level_values(1)
-    
-    # Create connected dot plot for dynamic features
-    dynamic_comparison_data = []
-    for feature in top_dynamic_features:
-        # Get importance in dynamic-only context
-        dynamic_importance = dynamic_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in dynamic_data.index.get_level_values(1) else 0
-        
-        # Get importance in combined context
-        combined_data = signed_consensus_data.xs(combined_condition, level=0, drop_level=False)
-        combined_importance = combined_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in combined_data.index.get_level_values(1) else 0
-        
-        dynamic_comparison_data.append({
-            'feature': feature,
-            'dynamic_only': dynamic_importance,
-            'combined': combined_importance,
-            'color': positive_color if dynamic_importance > 0 else negative_color
-        })
-    
-    # Plot dynamic features comparison
-    y_pos = range(len(dynamic_comparison_data))
-    for i, data in enumerate(dynamic_comparison_data):
-        # Plot dots and connecting line
-        ax1.plot([0, 1], [i, i], color='gray', alpha=0.7, linewidth=1)
-        ax1.scatter(0, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        ax1.scatter(1, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        
-        # Add value labels
-        ax1.text(0, i, f'{data["dynamic_only"]:.3f}', ha='right', va='center', fontsize=9)
-        ax1.text(1, i, f'{data["combined"]:.3f}', ha='left', va='center', fontsize=9)
-        
-        # Add feature labels
-        ax1.text(-0.1, i, data['feature'], ha='right', va='center', fontsize=9)
-    
-    ax1.set_xlim(-0.5, 1.5)
-    ax1.set_ylim(-1, len(dynamic_comparison_data))
-    ax1.set_xticks([0, 1])
-    ax1.set_xticklabels(['Dynamic-Only', 'Combined'])
-    ax1.set_ylabel('Feature')
-    ax1.grid(axis='x', alpha=0.2)
-    ax1.axhline(y=0, color='black', linestyle='--', alpha=0.5)
-    
-    # Panel 2: RNA-seq Features Comparison
-    ax2.set_title('RNA-seq Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
-    
-    # Get top RNA-seq features from RNA-seq-only condition
-    rnaseq_data = signed_consensus_data.xs(rnaseq_condition, level=0, drop_level=False)
-    top_rnaseq_features = rnaseq_data.nlargest(10, 'mean_importance_signed').index.get_level_values(1)
-    
-    # Create connected dot plot for RNA-seq features
-    rnaseq_comparison_data = []
-    for feature in top_rnaseq_features:
-        # Get importance in RNA-seq-only context
-        rnaseq_importance = rnaseq_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in rnaseq_data.index.get_level_values(1) else 0
-        
-        # Get importance in combined context
-        combined_importance = combined_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in combined_data.index.get_level_values(1) else 0
-        
-        rnaseq_comparison_data.append({
-            'feature': feature,
-            'rnaseq_only': rnaseq_importance,
-            'combined': combined_importance,
-            'color': positive_color if rnaseq_importance > 0 else negative_color
-        })
-    
-    # Plot RNA-seq features comparison
-    y_pos = range(len(rnaseq_comparison_data))
-    for i, data in enumerate(rnaseq_comparison_data):
-        # Plot dots and connecting line
-        ax2.plot([0, 1], [i, i], color='gray', alpha=0.7, linewidth=1)
-        ax2.scatter(0, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        ax2.scatter(1, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        
-        # Add value labels
-        ax2.text(0, i, f'{data["rnaseq_only"]:.3f}', ha='right', va='center', fontsize=9)
-        ax2.text(1, i, f'{data["combined"]:.3f}', ha='left', va='center', fontsize=9)
-        
-        # Add feature labels
-        ax2.text(-0.1, i, data['feature'], ha='right', va='center', fontsize=9)
-    
-    ax2.set_xlim(-0.5, 1.5)
-    ax2.set_ylim(-1, len(rnaseq_comparison_data))
-    ax2.set_xticks([0, 1])
-    ax2.set_xticklabels(['RNA-seq-Only', 'Combined'])
-    ax2.set_ylabel('Feature')
-    ax2.grid(axis='x', alpha=0.2)
-    ax2.axhline(y=0, color='black', linestyle='--', alpha=0.5)
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    
-    # Save the plot
-    plot_filename = f"{file_save_path}paired_comparison_cdk46_{exp_id}.png"
-    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    save_and_print(f"✓ Created CDK4/6 network paired comparison plot", print_report_file, level="info")
-    save_and_print(f"  Plot saved to: {plot_filename}", print_report_file, level="info")
-    
-    return fig
-
-# Create CDK4/6 paired comparison
-if 'shap_consensus_importance_signed' in datasets:
-    try:
-        cdk46_comparison_fig = create_cdk46_paired_comparison(
-            datasets['shap_consensus_importance_signed'], file_save_path, exp_id)
-        save_and_print("✓ Completed CDK4/6 network comparison creation", print_report_file, level="info")
-    except Exception as e:
-        save_and_print(f"❌ Error creating CDK4/6 network comparison: {str(e)}", print_report_file, level="info")
-else:
-    save_and_print("No data available for CDK4/6 network comparison", print_report_file, level="info")
-
-# %% [markdown]
-# ## Section 8: Major Plot 4 - FGFR4 Network Paired Comparison
-
-# %%
-save_and_print("## PLOT 4: FGFR4 Network - Feature Importance Comparison (Isolation vs Combined)", print_report_file, level="section")
-
-def create_fgfr4_paired_comparison(signed_consensus_data, file_save_path, exp_id):
-    """
-    Create paired comparison plots for FGFR4 network showing dynamic and RNA-seq features
-    in isolation vs combined contexts.
-    """
-    save_and_print("### Creating FGFR4 Network Paired Comparison", print_report_file, level="subsection")
-    
-    if not isinstance(signed_consensus_data, pd.DataFrame):
-        save_and_print("Invalid data format for FGFR4 paired comparison", print_report_file, level="info")
-        return
-    
-    # Extract conditions for FGFR4 network
-    fgfr4_conditions = [cond for cond in signed_consensus_data.index.get_level_values(0).unique() 
-                       if 'fgfr4' in cond]
-    
-    # Separate conditions by dataset type
-    dynamic_condition = next((cond for cond in fgfr4_conditions if 'dynamic' in cond), None)
-    rnaseq_condition = next((cond for cond in fgfr4_conditions if 'rnaseq' in cond), None)
-    combined_condition = next((cond for cond in fgfr4_conditions if 'combined' in cond), None)
-    
-    if not all([dynamic_condition, rnaseq_condition, combined_condition]):
-        save_and_print("Missing required conditions for FGFR4 comparison", print_report_file, level="info")
-        return
-    
-    # Set up publication-quality styling
-    plt.style.use('seaborn-v0_8')
-    plt.rcParams['font.family'] = 'sans-serif'
-    plt.rcParams['font.size'] = 11
-    
-    # Create figure with 1 row, 2 columns
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=300)
-    fig.suptitle('FGFR4 Network: Feature Importance Comparison\nIsolated vs Combined Dataset Contexts', 
-                 fontsize=16, fontweight='bold', y=0.95)
-    
-    # Color schemes
-    positive_color = '#1f77b4'  # Blue for positive
-    negative_color = '#dc143c'  # Red for negative
-    
-    # Panel 1: Dynamic Features Comparison
-    ax1.set_title('Dynamic Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
-    
-    # Get top dynamic features from dynamic-only condition
-    dynamic_data = signed_consensus_data.xs(dynamic_condition, level=0, drop_level=False)
-    top_dynamic_features = dynamic_data.nlargest(10, 'mean_importance_signed').index.get_level_values(1)
-    
-    # Create connected dot plot for dynamic features
-    dynamic_comparison_data = []
-    for feature in top_dynamic_features:
-        # Get importance in dynamic-only context
-        dynamic_importance = dynamic_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in dynamic_data.index.get_level_values(1) else 0
-        
-        # Get importance in combined context
-        combined_data = signed_consensus_data.xs(combined_condition, level=0, drop_level=False)
-        combined_importance = combined_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in combined_data.index.get_level_values(1) else 0
-        
-        dynamic_comparison_data.append({
-            'feature': feature,
-            'dynamic_only': dynamic_importance,
-            'combined': combined_importance,
-            'color': positive_color if dynamic_importance > 0 else negative_color
-        })
-    
-    # Plot dynamic features comparison
-    y_pos = range(len(dynamic_comparison_data))
-    for i, data in enumerate(dynamic_comparison_data):
-        # Plot dots and connecting line
-        ax1.plot([0, 1], [i, i], color='gray', alpha=0.7, linewidth=1)
-        ax1.scatter(0, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        ax1.scatter(1, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        
-        # Add value labels
-        ax1.text(0, i, f'{data["dynamic_only"]:.3f}', ha='right', va='center', fontsize=9)
-        ax1.text(1, i, f'{data["combined"]:.3f}', ha='left', va='center', fontsize=9)
-        
-        # Add feature labels
-        ax1.text(-0.1, i, data['feature'], ha='right', va='center', fontsize=9)
-    
-    ax1.set_xlim(-0.5, 1.5)
-    ax1.set_ylim(-1, len(dynamic_comparison_data))
-    ax1.set_xticks([0, 1])
-    ax1.set_xticklabels(['Dynamic-Only', 'Combined'])
-    ax1.set_ylabel('Feature')
-    ax1.grid(axis='x', alpha=0.2)
-    ax1.axhline(y=0, color='black', linestyle='--', alpha=0.5)
-    
-    # Panel 2: RNA-seq Features Comparison
-    ax2.set_title('RNA-seq Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
-    
-    # Get top RNA-seq features from RNA-seq-only condition
-    rnaseq_data = signed_consensus_data.xs(rnaseq_condition, level=0, drop_level=False)
-    top_rnaseq_features = rnaseq_data.nlargest(10, 'mean_importance_signed').index.get_level_values(1)
-    
-    # Create connected dot plot for RNA-seq features
-    rnaseq_comparison_data = []
-    for feature in top_rnaseq_features:
-        # Get importance in RNA-seq-only context
-        rnaseq_importance = rnaseq_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in rnaseq_data.index.get_level_values(1) else 0
-        
-        # Get importance in combined context
-        combined_importance = combined_data.xs(feature, level=1)['mean_importance_signed'].iloc[0] if feature in combined_data.index.get_level_values(1) else 0
-        
-        rnaseq_comparison_data.append({
-            'feature': feature,
-            'rnaseq_only': rnaseq_importance,
-            'combined': combined_importance,
-            'color': positive_color if rnaseq_importance > 0 else negative_color
-        })
-    
-    # Plot RNA-seq features comparison
-    y_pos = range(len(rnaseq_comparison_data))
-    for i, data in enumerate(rnaseq_comparison_data):
-        # Plot dots and connecting line
-        ax2.plot([0, 1], [i, i], color='gray', alpha=0.7, linewidth=1)
-        ax2.scatter(0, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        ax2.scatter(1, i, s=100, color=data['color'], edgecolor='black', alpha=0.8)
-        
-        # Add value labels
-        ax2.text(0, i, f'{data["rnaseq_only"]:.3f}', ha='right', va='center', fontsize=9)
-        ax2.text(1, i, f'{data["combined"]:.3f}', ha='left', va='center', fontsize=9)
-        
-        # Add feature labels
-        ax2.text(-0.1, i, data['feature'], ha='right', va='center', fontsize=9)
-    
-    ax2.set_xlim(-0.5, 1.5)
-    ax2.set_ylim(-1, len(rnaseq_comparison_data))
-    ax2.set_xticks([0, 1])
-    ax2.set_xticklabels(['RNA-seq-Only', 'Combined'])
-    ax2.set_ylabel('Feature')
-    ax2.grid(axis='x', alpha=0.2)
-    ax2.axhline(y=0, color='black', linestyle='--', alpha=0.5)
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    
-    # Save the plot
-    plot_filename = f"{file_save_path}paired_comparison_fgfr4_{exp_id}.png"
-    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    save_and_print(f"✓ Created FGFR4 network paired comparison plot", print_report_file, level="info")
-    save_and_print(f"  Plot saved to: {plot_filename}", print_report_file, level="info")
-    
-    return fig
-
-# Create FGFR4 paired comparison
-if 'shap_consensus_importance_signed' in datasets:
-    try:
-        fgfr4_comparison_fig = create_fgfr4_paired_comparison(
-            datasets['shap_consensus_importance_signed'], file_save_path, exp_id)
-        save_and_print("✓ Completed FGFR4 network comparison creation", print_report_file, level="info")
-    except Exception as e:
-        save_and_print(f"❌ Error creating FGFR4 network comparison: {str(e)}", print_report_file, level="info")
-else:
-    save_and_print("No data available for FGFR4 network comparison", print_report_file, level="info")
 
 # %%
 save_and_print("## PLOT 3: CDK4/6 Network - Feature Importance Comparison (Isolation vs Combined)", print_report_file, level="section")
@@ -1239,11 +936,11 @@ def create_cdk46_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
     # Set up publication-quality styling
     plt.style.use('seaborn-v0_8')
     plt.rcParams['font.family'] = 'sans-serif'
-    plt.rcParams['font.size'] = 11
+    plt.rcParams['font.size'] = 14
     
     # Create figure with 1 row, 2 columns
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=300)
-    fig.suptitle('CDK4/6 Network: Feature Importance Comparison\nIsolated vs Combined Dataset Contexts', 
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), dpi=300)
+    fig.suptitle('CDK4/6 Network: Feature Importance Comparison', 
                  fontsize=16, fontweight='bold', y=0.95)
     
     # Color schemes
@@ -1251,7 +948,7 @@ def create_cdk46_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
     negative_color = '#dc143c'  # Red for negative
     
     # Panel 1: Dynamic Features Comparison
-    ax1.set_title('Dynamic Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
+    ax1.set_title('Dynamic Features: Isolation vs Combined', fontsize=14)
     
     # Get top dynamic features from dynamic-only condition
     dynamic_data = signed_consensus_data.xs(dynamic_condition, level=0, drop_level=False)
@@ -1293,20 +990,20 @@ def create_cdk46_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
         width1 = bar1.get_width()
         width2 = bar2.get_width()
         ax1.text(width1, bar1.get_y() + bar1.get_height()/2, f'{width1:.3f}', 
-                ha='left' if width1 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width1 >= 0 else 'right', va='center', fontsize=11)
         ax1.text(width2, bar2.get_y() + bar2.get_height()/2, f'{width2:.3f}', 
-                ha='left' if width2 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width2 >= 0 else 'right', va='center', fontsize=11)
     
     # Customize the plot
     ax1.set_yticks(y_pos)
-    ax1.set_yticklabels([data['feature'] for data in dynamic_comparison_data], fontsize=9)
-    ax1.set_xlabel('Mean Signed SHAP Value', fontsize=12)
+    ax1.set_yticklabels([data['feature'] for data in dynamic_comparison_data], fontsize=12)
+    ax1.set_xlabel('Mean Signed SHAP Value', fontsize=14)
     ax1.axvline(x=0, color='black', linestyle='-', alpha=0.5, linewidth=1)
-    ax1.legend(loc='lower right')
+    ax1.legend(loc='upper right')
     ax1.grid(axis='x', alpha=0.2, linestyle='--')
     
     # Panel 2: RNA-seq Features Comparison
-    ax2.set_title('RNA-seq Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
+    ax2.set_title('RNA-seq Features: Isolation vs Combined', fontsize=14)
     
     # Get top RNA-seq features from RNA-seq-only condition
     rnaseq_data = signed_consensus_data.xs(rnaseq_condition, level=0, drop_level=False)
@@ -1346,19 +1043,19 @@ def create_cdk46_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
         width1 = bar1.get_width()
         width2 = bar2.get_width()
         ax2.text(width1, bar1.get_y() + bar1.get_height()/2, f'{width1:.3f}', 
-                ha='left' if width1 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width1 >= 0 else 'right', va='center', fontsize=11)
         ax2.text(width2, bar2.get_y() + bar2.get_height()/2, f'{width2:.3f}', 
-                ha='left' if width2 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width2 >= 0 else 'right', va='center', fontsize=11)
     
     # Customize the plot
     ax2.set_yticks(y_pos)
-    ax2.set_yticklabels([data['feature'] for data in rnaseq_comparison_data], fontsize=9)
-    ax2.set_xlabel('Mean Signed SHAP Value', fontsize=12)
+    ax2.set_yticklabels([data['feature'] for data in rnaseq_comparison_data], fontsize=12)
+    ax2.set_xlabel('Mean Signed SHAP Value', fontsize=14)
     ax2.axvline(x=0, color='black', linestyle='-', alpha=0.5, linewidth=1)
-    ax2.legend(loc='lower right')
+    ax2.legend(loc='upper right')
     ax2.grid(axis='x', alpha=0.2, linestyle='--')
     
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.tight_layout()
     
     # Save the plot
     plot_filename = f"{file_save_path}mirrored_barchart_cdk46_{exp_id}.png"
@@ -1411,11 +1108,11 @@ def create_fgfr4_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
     # Set up publication-quality styling [1]
     plt.style.use('seaborn-v0_8')
     plt.rcParams['font.family'] = 'sans-serif'
-    plt.rcParams['font.size'] = 11
+    plt.rcParams['font.size'] = 14
     
     # Create figure with 1 row, 2 columns
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), dpi=300)
-    fig.suptitle('FGFR4 Network: Feature Importance Comparison\nIsolated vs Combined Dataset Contexts', 
+    fig.suptitle('FGFR4 Network: Feature Importance Comparison', 
                  fontsize=16, fontweight='bold', y=0.95)
     
     # Color schemes
@@ -1423,7 +1120,7 @@ def create_fgfr4_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
     negative_color = '#dc143c'  # Red for negative
     
     # Panel 1: Dynamic Features Comparison
-    ax1.set_title('Dynamic Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
+    ax1.set_title('Dynamic Features: Isolation vs Combined', fontsize=14)
     
     # Get top dynamic features from dynamic-only condition [1]
     dynamic_data = signed_consensus_data.xs(dynamic_condition, level=0, drop_level=False)
@@ -1465,20 +1162,20 @@ def create_fgfr4_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
         width1 = bar1.get_width()
         width2 = bar2.get_width()
         ax1.text(width1, bar1.get_y() + bar1.get_height()/2, f'{width1:.3f}', 
-                ha='left' if width1 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width1 >= 0 else 'right', va='center', fontsize=11)
         ax1.text(width2, bar2.get_y() + bar2.get_height()/2, f'{width2:.3f}', 
-                ha='left' if width2 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width2 >= 0 else 'right', va='center', fontsize=11)
     
     # Customize the plot
     ax1.set_yticks(y_pos)
-    ax1.set_yticklabels([data['feature'] for data in dynamic_comparison_data], fontsize=9)
-    ax1.set_xlabel('Mean Signed SHAP Value', fontsize=12)
+    ax1.set_yticklabels([data['feature'] for data in dynamic_comparison_data], fontsize=12)
+    ax1.set_xlabel('Mean Signed SHAP Value', fontsize=14)
     ax1.axvline(x=0, color='black', linestyle='-', alpha=0.5, linewidth=1)
-    ax1.legend(loc='lower right')
+    ax1.legend(loc='upper right')
     ax1.grid(axis='x', alpha=0.2, linestyle='--')
     
     # Panel 2: RNA-seq Features Comparison
-    ax2.set_title('RNA-seq Features: Isolation vs Combined Context', fontsize=14, fontweight='bold')
+    ax2.set_title('RNA-seq Features: Isolation vs Combined', fontsize=14)
     
     # Get top RNA-seq features from RNA-seq-only condition [1]
     rnaseq_data = signed_consensus_data.xs(rnaseq_condition, level=0, drop_level=False)
@@ -1518,19 +1215,19 @@ def create_fgfr4_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
         width1 = bar1.get_width()
         width2 = bar2.get_width()
         ax2.text(width1, bar1.get_y() + bar1.get_height()/2, f'{width1:.3f}', 
-                ha='left' if width1 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width1 >= 0 else 'right', va='center', fontsize=11)
         ax2.text(width2, bar2.get_y() + bar2.get_height()/2, f'{width2:.3f}', 
-                ha='left' if width2 >= 0 else 'right', va='center', fontsize=8)
+                ha='left' if width2 >= 0 else 'right', va='center', fontsize=11)
     
     # Customize the plot
     ax2.set_yticks(y_pos)
-    ax2.set_yticklabels([data['feature'] for data in rnaseq_comparison_data], fontsize=9)
+    ax2.set_yticklabels([data['feature'] for data in rnaseq_comparison_data], fontsize=12)
     ax2.set_xlabel('Mean Signed SHAP Value', fontsize=12)
     ax2.axvline(x=0, color='black', linestyle='-', alpha=0.5, linewidth=1)
-    ax2.legend(loc='lower right')
+    ax2.legend(loc='upper right')
     ax2.grid(axis='x', alpha=0.2, linestyle='--')
     
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.tight_layout()
     
     # Save the plot
     plot_filename = f"{file_save_path}mirrored_barchart_fgfr4_{exp_id}.png"
