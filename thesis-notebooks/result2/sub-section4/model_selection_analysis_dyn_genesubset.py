@@ -204,7 +204,7 @@ sns.set_palette("husl")
 
 # Create consistent color mapping for feature types
 feature_type_colors = {
-    'genesubset': '#1f77b4',  # Blue for gene subset (replaces RNASeq)
+    'genesubset': '#ef99b4',  # Blue for gene subset (replaces RNASeq)
     'dynamic': '#ff7f0e',     # Orange for Dynamic
     'combined': '#2ca02c'     # Green for Combined
 }
