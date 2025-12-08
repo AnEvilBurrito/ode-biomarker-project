@@ -361,7 +361,7 @@ def parse_condition_title(condition):
     dataset_mapping = {
         'dynamic': 'Dynamic Features',
         'genesubset': 'Network-specific Gene Subsets', 
-        'combined': 'Combined Dataset'
+        'combined': 'Combined (Gene Subset)'
     }
     
     # Extract components (handle variable length parts)
@@ -982,7 +982,7 @@ def create_cdk46_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
                     color=positive_color, alpha=0.7, label='Dynamic-Only', 
                     edgecolor='black', linewidth=1)
     bars2 = ax1.barh(y_pos + bar_height/2, combined_values, bar_height, 
-                    color=negative_color, alpha=0.7, label='Combined', 
+                    color=negative_color, alpha=0.7, label='Combined (Gene Subset)', 
                     edgecolor='black', linewidth=1)
     
     # Add value labels
@@ -1035,7 +1035,7 @@ def create_cdk46_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
                     color=positive_color, alpha=0.7, label='Gene Subset-Only', 
                     edgecolor='black', linewidth=1)
     bars2 = ax2.barh(y_pos + bar_height/2, combined_values, bar_height, 
-                    color=negative_color, alpha=0.7, label='Combined', 
+                    color=negative_color, alpha=0.7, label='Combined (Gene Subset)', 
                     edgecolor='black', linewidth=1)
     
     # Add value labels
@@ -1154,7 +1154,7 @@ def create_fgfr4_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
                     color=positive_color, alpha=0.7, label='Dynamic-Only', 
                     edgecolor='black', linewidth=1)
     bars2 = ax1.barh(y_pos + bar_height/2, combined_values, bar_height, 
-                    color=negative_color, alpha=0.7, label='Combined', 
+                    color=negative_color, alpha=0.7, label='Combined (Gene Subset)', 
                     edgecolor='black', linewidth=1)
     
     # Add value labels
@@ -1207,7 +1207,7 @@ def create_fgfr4_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
                     color=positive_color, alpha=0.7, label='Gene Subset-Only', 
                     edgecolor='black', linewidth=1)
     bars2 = ax2.barh(y_pos + bar_height/2, combined_values, bar_height, 
-                    color=negative_color, alpha=0.7, label='Combined', 
+                    color=negative_color, alpha=0.7, label='Combined (Gene Subset)', 
                     edgecolor='black', linewidth=1)
     
     # Add value labels
