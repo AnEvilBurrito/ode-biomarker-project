@@ -490,7 +490,7 @@ if 'shap_consensus_importance_signed' in datasets:
                     
                     # Save the plot
                     condition_clean = condition.replace(' ', '_').replace('/', '_')
-                    plot_filename = f"{file_save_path}shap_bidirectional_{condition_clean}_{exp_id}.png"
+                    plot_filename = f"{file_save_path}shap_bidirectional_{condition_clean}_{exp_id}.svg"
                     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
                     plt.show()
                     
@@ -730,7 +730,7 @@ def create_positive_matrix_plot(signed_consensus_data, file_save_path, exp_id):
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     
     # Save the plot
-    plot_filename = f"{file_save_path}shap_positive_matrix_{exp_id}.png"
+    plot_filename = f"{file_save_path}shap_positive_matrix_{exp_id}.svg"
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
     plt.show()
     
@@ -886,7 +886,7 @@ def create_negative_matrix_plot(signed_consensus_data, file_save_path, exp_id):
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     
     # Save the plot
-    plot_filename = f"{file_save_path}shap_negative_matrix_{exp_id}.png"
+    plot_filename = f"{file_save_path}shap_negative_matrix_{exp_id}.svg"
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
     plt.show()
     
@@ -1058,7 +1058,7 @@ def create_cdk46_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
     plt.tight_layout()
     
     # Save the plot
-    plot_filename = f"{file_save_path}mirrored_barchart_cdk46_{exp_id}.png"
+    plot_filename = f"{file_save_path}mirrored_barchart_cdk46_{exp_id}.svg"
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
     plt.show()
     
@@ -1230,7 +1230,7 @@ def create_fgfr4_mirrored_barchart(signed_consensus_data, file_save_path, exp_id
     plt.tight_layout()
     
     # Save the plot
-    plot_filename = f"{file_save_path}mirrored_barchart_fgfr4_{exp_id}.png"
+    plot_filename = f"{file_save_path}mirrored_barchart_fgfr4_{exp_id}.svg"
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
     plt.show()
     
